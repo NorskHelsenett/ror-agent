@@ -74,8 +74,6 @@ jobs:
       - name: Move artifacts
         run: |
           mv binary-build v2/dist
-          ls v2/dist
-          ls dist
 
       - name: Install cosign
         if: github.event_name != 'pull_request'

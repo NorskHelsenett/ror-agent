@@ -3,8 +3,8 @@ package resourceupdatev2
 import (
 	"fmt"
 
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/clients"
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/services/authservice"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/clients"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/services/authservice"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/v2/apicontractsv2resources"
 	"github.com/NorskHelsenett/ror/pkg/rlog"

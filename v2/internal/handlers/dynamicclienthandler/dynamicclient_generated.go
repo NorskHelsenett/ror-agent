@@ -1,11 +1,11 @@
 // THIS FILE IS GENERATED, DO NOT EDIT
 // ref: build/generator/main.go
 
-package dynamictargets
+package dynamicclienthandler
 
 import "k8s.io/apimachinery/pkg/runtime/schema"
 
-func InitSchema() []schema.GroupVersionResource {
+func (handler)GetSchemas() []schema.GroupVersionResource {
 	var schemas []schema.GroupVersionResource
 	schemas = append(schemas, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"})
 	schemas = append(schemas, schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"})

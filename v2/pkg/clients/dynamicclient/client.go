@@ -14,9 +14,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var schemas []schema.GroupVersionResource
+type DynamicClientHandler interface {
+	AddResource(obj any)
+	DeleteResource(obj any)
+	UpdateResource(_ any, obj any)
+	GetSchemas() []schema.GroupVersionResource
+}
 
-func Start(k *kubernetesclient.K8sClientsets, targets []schema.GroupVersionResource, stop chan struct{}, sigs chan os.Signal) error {
+func Start(k *kubernetesclient.K8sClientsets, dynamichandler DynamicClientHandler, stop chan struct{}, sigs chan os.Signal) error {
 	rlog.Info("Starting dynamic watchers")
 	discoveryClient, err := k.GetDiscoveryClient()
 	if err != nil {
@@ -29,13 +34,14 @@ func Start(k *kubernetesclient.K8sClientsets, targets []schema.GroupVersionResou
 		return err
 	}
 
-	for _, schema := range targets {
+	schemas := dynamichandler.GetSchemas()
+	for _, schema := range schemas {
 		check, err := discovery.IsResourceEnabled(discoveryClient, schema)
 		if err != nil {
 			rlog.Error("Could not query resources from cluster", err)
 		}
 		if check {
-			controller := newDynamicWatcher(dynamicClient, schema)
+			controller := newDynamicWatcher(dynamichandler, dynamicClient, schema)
 			go func() {
 				controller.Run(stop)
 			}()
@@ -58,7 +64,7 @@ func (c *DynamicWatcher) Run(stop <-chan struct{}) {
 }
 
 // Function creates a new dynamic controller to listen for api-changes in provided GroupVersionResource
-func newDynamicWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *DynamicWatcher {
+func newDynamicWatcher(dynamichandler DynamicClientHandler, client dynamic.Interface, resource schema.GroupVersionResource) *DynamicWatcher {
 	dynWatcher := &DynamicWatcher{}
 	dynInformer := dynamicinformer.NewDynamicSharedInformerFactory(client, 0)
 	informer := dynInformer.ForResource(resource).Informer()
@@ -67,9 +73,9 @@ func newDynamicWatcher(client dynamic.Interface, resource schema.GroupVersionRes
 	dynWatcher.dynInformer = informer
 
 	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    addResource,
-		UpdateFunc: updateResource,
-		DeleteFunc: deleteResource,
+		AddFunc:    dynamichandler.AddResource,
+		UpdateFunc: dynamichandler.UpdateResource,
+		DeleteFunc: dynamichandler.DeleteResource,
 	})
 	if err != nil {
 		rlog.Error("Error adding event handler", err)

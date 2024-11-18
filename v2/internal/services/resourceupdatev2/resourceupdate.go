@@ -1,7 +1,7 @@
 package resourceupdatev2
 
 import (
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/clients"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/clients"
 
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rorkubernetes"
 

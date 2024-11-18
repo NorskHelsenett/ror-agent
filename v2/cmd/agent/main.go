@@ -4,11 +4,11 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/agentconfig"
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/clients"
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/clients/dynamictargets"
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/scheduler"
-	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/services/resourceupdatev2"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/agentconfig"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/clients"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/handlers/dynamicclienthandler"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/scheduler"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/services/resourceupdatev2"
 	"github.com/NorskHelsenett/ror-agent/v2/pkg/clients/dynamicclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
@@ -50,8 +50,8 @@ func main() {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 
-	targets := dynamictargets.InitSchema()
-	err = dynamicclient.Start(clients.Kubernetes, targets, stop, sigs)
+	dynamicclienthandler := dynamicclienthandler.NewDynamicClientHandler()
+	err = dynamicclient.Start(clients.Kubernetes, dynamicclienthandler, stop, sigs)
 	if err != nil {
 		rlog.Fatal("could not start dynamic client", err)
 	}

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/NorskHelsenett/ror-agent/v2/clients"
-	"github.com/NorskHelsenett/ror-agent/v2/services/authservice"
+	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/clients"
+	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/services/authservice"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/v2/apicontractsv2resources"

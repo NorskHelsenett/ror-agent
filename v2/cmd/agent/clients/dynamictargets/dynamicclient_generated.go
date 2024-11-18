@@ -1,7 +1,7 @@
 // THIS FILE IS GENERATED, DO NOT EDIT
 // ref: build/generator/main.go
 
-package dynamicclient
+package dynamictargets
 
 import "k8s.io/apimachinery/pkg/runtime/schema"
 

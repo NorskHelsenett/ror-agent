@@ -1,8 +1,8 @@
 package resourceupdatev2
 
 import (
-	"github.com/NorskHelsenett/ror-agent/v2/agentconfig"
-	"github.com/NorskHelsenett/ror-agent/v2/clients"
+	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/agentconfig"
+	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/clients"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 

@@ -16,7 +16,7 @@ import (
 
 var schemas []schema.GroupVersionResource
 
-func Start(k *kubernetesclient.K8sClientsets, stop chan struct{}, sigs chan os.Signal) error {
+func Start(k *kubernetesclient.K8sClientsets, targets []schema.GroupVersionResource, stop chan struct{}, sigs chan os.Signal) error {
 	rlog.Info("Starting dynamic watchers")
 	discoveryClient, err := k.GetDiscoveryClient()
 	if err != nil {
@@ -29,8 +29,7 @@ func Start(k *kubernetesclient.K8sClientsets, stop chan struct{}, sigs chan os.S
 		return err
 	}
 
-	schemas = InitSchema()
-	for _, schema := range schemas {
+	for _, schema := range targets {
 		check, err := discovery.IsResourceEnabled(discoveryClient, schema)
 		if err != nil {
 			rlog.Error("Could not query resources from cluster", err)

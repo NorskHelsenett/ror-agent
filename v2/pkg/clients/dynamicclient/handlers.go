@@ -1,7 +1,7 @@
 package dynamicclient
 
 import (
-	"github.com/NorskHelsenett/ror-agent/v2/services/resourceupdatev2"
+	"github.com/NorskHelsenett/ror-agent/v2/cmd/agent/services/resourceupdatev2"
 
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
 

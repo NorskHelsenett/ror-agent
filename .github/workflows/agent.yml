@@ -105,6 +105,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
+            type=raw,value=latestv1
             type=raw,value=${{ env.ROR_VERSION }}
 
       # Build and push Docker image with Buildx (don't push on PR)

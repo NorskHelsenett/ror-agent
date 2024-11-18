@@ -72,7 +72,7 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Move artifacts
-        run: mv binary-build dist
+        run: mv binary-build v2/dist
 
       - name: Install cosign
         if: github.event_name != 'pull_request'

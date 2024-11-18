@@ -20,7 +20,6 @@ import (
 
 	"github.com/spf13/viper"
 
-	// https://blog.devgenius.io/know-gomaxprocs-before-deploying-your-go-app-to-kubernetes-7a458fb63af1
 	"go.uber.org/automaxprocs/maxprocs"
 )
 

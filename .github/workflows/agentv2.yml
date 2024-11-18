@@ -2,8 +2,8 @@ name: Build Cluster Agent v2
 
 on:
   push:
-    branches: 
-      - "feature/build-images"
+    paths:
+      - v2/**
     # Publish semver tags as releases.
     #tags: [ 'v*.*.*' ]
   pull_request:
@@ -57,6 +57,7 @@ jobs:
 
   build-container-image:
     runs-on: ubuntu-latest
+    if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
     needs: build-app
     permissions:
       contents: read

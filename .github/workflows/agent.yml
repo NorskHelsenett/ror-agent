@@ -1,9 +1,7 @@
-name: Build Cluster Agent v2
+name: Build Cluster Agent v1
 
 on:
   push:
-    paths:
-      - '**'
     paths-ignore:
       - 'v2/**'
     # Publish semver tags as releases.

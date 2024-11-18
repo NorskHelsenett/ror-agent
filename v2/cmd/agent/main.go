@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	_ = "rebuild 11"
+	_ = "rebuild 12"
 	_, _ = maxprocs.Set(maxprocs.Logger(rlog.Infof))
 	agentconfig.Init()
 	rlog.Info("Agent is starting", rlog.String("version", viper.GetString(configconsts.VERSION)), rlog.String("commit", viper.GetString(configconsts.COMMIT)))

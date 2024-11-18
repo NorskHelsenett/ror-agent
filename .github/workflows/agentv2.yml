@@ -16,7 +16,7 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   # test
-  IMAGE_NAME: ror-cluster-agent
+  IMAGE_NAME: norskhelsenett/ror-cluster-agent
   ROR_VERSION: v2.0.0
 
 jobs:

@@ -2,8 +2,9 @@ package resourceupdatev2
 
 import (
 	"fmt"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/services/authservice"
 	"time"
+
+	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 

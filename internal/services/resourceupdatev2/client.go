@@ -2,9 +2,10 @@ package resourceupdatev2
 
 import (
 	"encoding/json"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/clients"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/config"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/services/authservice"
+
+	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
+	"github.com/NorskHelsenett/ror-agent/internal/config"
+	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 

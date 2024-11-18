@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/clients"
+	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/operator/initialize"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"

@@ -3,10 +3,11 @@ package scheduler
 import (
 	"context"
 	"encoding/json"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/clients"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/config"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/services/authservice"
 	"time"
+
+	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
+	"github.com/NorskHelsenett/ror-agent/internal/config"
+	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"

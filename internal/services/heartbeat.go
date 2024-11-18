@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/clients"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/models"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/utils"
+	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/k8smodels"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/nodeservice"
+	"github.com/NorskHelsenett/ror-agent/internal/models/argomodels"
+	"github.com/NorskHelsenett/ror-agent/internal/utils"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 
@@ -271,8 +271,8 @@ func getNhnToolingMetadata(k8sClient *kubernetes.Clientset, dynamicClient dynami
 	return result, nil
 }
 
-func getNhnToolingInfo(dynamicClient dynamic.Interface) (models.Application, error) {
-	result := models.Application{}
+func getNhnToolingInfo(dynamicClient dynamic.Interface) (argomodels.Application, error) {
+	result := argomodels.Application{}
 	applications, err := dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "argoproj.io",
 		Version:  "v1alpha1",
@@ -291,7 +291,7 @@ func getNhnToolingInfo(dynamicClient dynamic.Interface) (models.Application, err
 		return result, err
 	}
 
-	var nhnTooling models.Application
+	var nhnTooling argomodels.Application
 	err = json.Unmarshal(appByteArray, &nhnTooling)
 	if err != nil {
 		rlog.Error("could not marshal applications", err)

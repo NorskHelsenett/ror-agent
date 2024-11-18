@@ -1,8 +1,8 @@
 package resourceupdatev2
 
 import (
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/services/authservice"
 	"github.com/NorskHelsenett/ror-agent/internal/models/rorResources"
+	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 

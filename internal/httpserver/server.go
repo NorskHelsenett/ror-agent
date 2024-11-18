@@ -2,10 +2,11 @@ package httpserver
 
 import (
 	"encoding/json"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/clients"
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/config"
 	"net/http"
 	"strings"
+
+	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
+	"github.com/NorskHelsenett/ror-agent/internal/config"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/helpers/otel/httpserver"

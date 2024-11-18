@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/NorskHelsenett/ror-agent/cmd/agent/services/resourceupdatev2"
+	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdatev2"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 	"github.com/NorskHelsenett/ror/pkg/rlog"

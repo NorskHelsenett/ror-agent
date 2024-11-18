@@ -17,7 +17,7 @@ env:
   # github.repository as <account>/<repo>
   # test
   IMAGE_NAME: ${{ github.repository }}-cluster-agentv2
-  ROR_VERSION: v1.0.1
+  ROR_VERSION: v2.0.0
 
 jobs:
   build-app:
@@ -50,14 +50,14 @@ jobs:
       with:
         name: binary-build
         path: |
-          dist/agent
-          dist/isbuilt/agentv2
+          v2/dist/agent
+          v2/dist/isbuilt/agentv2
         retention-days: 1
 
 
   build-container-image:
     runs-on: ubuntu-latest
-    if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+    #if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
     needs: build-app
     permissions:
       contents: read

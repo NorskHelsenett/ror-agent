@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/v2/internal/clients"
-	"github.com/NorskHelsenett/ror-agent/v2/internal/services/authservice"
 
-	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/v2/apicontractsv2resources"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
@@ -27,6 +25,7 @@ type resourcecache struct {
 
 func (rc *resourcecache) Init() error {
 	var err error
+
 	rc.HashList, err = InitHashList()
 	if err != nil {
 		return err
@@ -78,22 +77,13 @@ func (rc *resourcecache) finnishCleanup() {
 	if len(inactive) == 0 {
 		return
 	}
+	rorclient := clients.RorConfig.GetRorClient()
 	for _, uid := range inactive {
 		rlog.Info(fmt.Sprintf("Removing resource %s", uid))
-
-		// rorres := rorkubernetes.NewResourceFromDynamicClient(input)
-		// err := rorres.SetRorMeta(rortypes.ResourceRorMeta{
-		// 	Version:  "v2",
-		// 	Ownerref: clients.RorConfig.CreateOwnerref(),
-		// 	Action:   action,
-		// })
-
-		resource := apiresourcecontracts.ResourceUpdateModel{
-			Owner:  authservice.CreateOwnerref(),
-			Uid:    uid,
-			Action: apiresourcecontracts.K8sActionDelete,
+		_, err := rorclient.ResourceV2().Delete(context.Background(), uid)
+		if err != nil {
+			rlog.Error(fmt.Sprintf("Error removing resource %s", uid), err)
 		}
-		_ = sendResourceUpdateToRor(&resource)
 	}
 	rlog.Info(fmt.Sprintf("resource cleanup done, %d resources removed", len(inactive)))
 }

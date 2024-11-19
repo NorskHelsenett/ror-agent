@@ -84,10 +84,7 @@ func GetIngressDetails(ingress *networkingV1.Ingress) (*apicontracts.Ingress, er
 		Rules:     rules,
 	}
 
-	richIngress, err := GetIngressHealth(newIngress)
-
-	return richIngress, nil
-
+	return GetIngressHealth(newIngress)
 }
 
 func GetIngressHealth(thisIngress apicontracts.Ingress) (*apicontracts.Ingress, error) {

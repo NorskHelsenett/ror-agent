@@ -11,7 +11,7 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-// the function sends the resource to the ror api. If recieving a non 2xx statuscode it will retun an error.
+// the function sends the resource to the ror api. If receiving a non 2xx statuscode it will retun an error.
 func sendResourceUpdateToRor(resourceUpdate *apiresourcecontracts.ResourceUpdateModel) error {
 	rorClient, err := clients.GetOrCreateRorClient()
 	if err != nil {

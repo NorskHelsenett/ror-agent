@@ -55,7 +55,7 @@ func (rc *resourcecache) addWorkQeueScheduler(seconds int) {
 }
 func (rc *resourcecache) runWorkQeueScheduler() {
 	if rc.WorkQueue.NeedToRun() {
-		rlog.Warn("resourceQueue has non zero lenght", rlog.Int("resource Queue length", rc.WorkQueue.ItemCount()))
+		rlog.Warn("resourceQueue has non zero length", rlog.Int("resource Queue length", rc.WorkQueue.ItemCount()))
 		rc.RunWorkQeue()
 	}
 }

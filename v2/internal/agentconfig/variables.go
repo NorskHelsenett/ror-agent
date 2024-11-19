@@ -10,12 +10,12 @@
 // The version and commit are set to the default  v1.1.0/FFFFF if not set at compile time
 //
 // The configuration variables are set to the default values if not set in the environment
-// The enviroment variables required are:
+// The environment variables required are:
 // ROLE default value is ClusterAgent
 // HEALTH_ENDPOINT default value is :8100
 // POD_NAMESPACE default value is ror
 // API_KEY_SECRET default value is ror-apikey
-// API_KEY migt be provided by the user if a secret containg the api key is not present in the cluster
+// API_KEY migt be provided by the user if a secret containing the api key is not present in the cluster
 //
 
 package agentconfig

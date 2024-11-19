@@ -49,7 +49,7 @@ func (rc resourcecache) addWorkqueScheduler(seconds int) {
 }
 func (rc resourcecache) runWorkqueScheduler() {
 	if rc.Workqueue.NeedToRun() {
-		rlog.Warn("resourceQue has non zero lenght", rlog.Int("resource que length", rc.Workqueue.ItemCount()))
+		rlog.Warn("resourceQue has non zero length", rlog.Int("resource que length", rc.Workqueue.ItemCount()))
 		rc.RunWorkQue()
 	}
 }

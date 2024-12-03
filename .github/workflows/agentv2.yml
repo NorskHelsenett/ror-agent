@@ -96,7 +96,7 @@ jobs:
       - name: Move artifacts
         run: |
           mv binary-build v2/dist
-          chmod +x dist/agent
+          chmod +x v2/dist/agent
 
       - name: Install cosign
         if: github.event_name != 'pull_request'

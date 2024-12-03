@@ -1,7 +1,7 @@
 ARG GCR_MIRROR=gcr.io/
 FROM ${GCR_MIRROR}distroless/static:nonroot
-LABEL org.opencontainers.image.source https://github.com/norskhelsenett/ror-agent
-LABEL org.opencontainers.image.description ROR Agent v2
+LABEL org.opencontainers.image.source="https://github.com/norskhelsenett/ror-agent"
+LABEL org.opencontainers.image.description="ROR Agent v2"
 WORKDIR /
 
 COPY dist/agent /bin/ror-cluster-agent

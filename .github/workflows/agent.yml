@@ -59,7 +59,7 @@ jobs:
         echo $ROR_VERSION
         go get ./...
         mkdir -p dist/isbuilt
-        CGO_ENABLED=0 go build -o dist/agent -ldflags "-w -extldflags '-static' -X internal/config.version=$ROR_VERSION -X internal/config.commit=$CI_COMMIT_SHORT_SHA" cmd/agent/main.go
+        CGO_ENABLED=0 go build -o dist/agent -ldflags "-w -extldflags '-static' -X github.com/NorskHelsenett/ror-agent/internal/config.version=$ROR_VERSION -X github.com/NorskHelsenett/ror-agent/internal/config.commit=$CI_COMMIT_SHORT_SHA" cmd/agent/main.go
         touch dist/isbuilt/agent
       env:
         ROR_VERSION: ${{ needs.bump-version.outputs.ror_version }}

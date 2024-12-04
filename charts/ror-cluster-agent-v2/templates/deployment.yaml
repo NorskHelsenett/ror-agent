@@ -45,16 +45,16 @@ spec:
               value: {{ .Values.secretname }}
           ports:
             - name: liveness-probe
-              containerPort: 8100
+              containerPort: 9998
               protocol: TCP
           livenessProbe:
             httpGet:
               path: /health
-              port: 8100
+              port: liveness-probe
           readinessProbe:
             httpGet:
               path: /health
-              port: 8100
+              port: liveness-probe
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

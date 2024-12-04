@@ -14,6 +14,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorclientconfig"
 
+	healthserver "github.com/NorskHelsenett/ror/pkg/helpers/rorhealth/server"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	"syscall"
@@ -41,6 +42,9 @@ func main() {
 		RorVersion:               agentconfig.GetRorVersion(),
 		MustInitializeKubernetes: true,
 	}
+
+	rlog.Info("Initializing health server")
+	_ = healthserver.Start(healthserver.ServerString(viper.GetString(configconsts.HEALTH_ENDPOINT)))
 
 	clients.InitClients(clientConfig)
 

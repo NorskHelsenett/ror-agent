@@ -1,2 +1,4 @@
 dist/agent
 .vscode/**
+cmd/agent/__debug_bin*
+v2/cmd/agent/__debug_bin*

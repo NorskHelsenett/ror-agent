@@ -48,6 +48,7 @@ func Init() {
 	viper.SetDefault(configconsts.HEALTH_ENDPOINT, ":8100")
 	viper.SetDefault(configconsts.POD_NAMESPACE, "ror")
 	viper.SetDefault(configconsts.API_KEY_SECRET, "ror-apikey")
+	viper.SetDefault(configconsts.HEALTH_ENDPOINT, ":9998")
 	viper.AutomaticEnv()
 }
 

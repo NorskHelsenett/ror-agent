@@ -10,7 +10,7 @@ import (
 
 func InitHashList() (*apicontractsv2resources.HashList, error) {
 	rorclient := clients.RorConfig.GetRorClient()
-	hashList, err := rorclient.ResourceV2().GetOwnHashes()
+	hashList, err := rorclient.ResourceV2().GetOwnHashes(clients.RorConfig.GetClusterId())
 	if err != nil {
 		fmt.Println("Error getting hashlist from api", err)
 		return nil, err

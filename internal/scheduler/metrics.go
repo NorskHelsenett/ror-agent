@@ -11,13 +11,14 @@ import (
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
-	aclmodels "github.com/NorskHelsenett/ror/pkg/models/acl"
+	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	apimachinery "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
 )
 
+// TODO: Change to use RorClient
 func MetricsReporting() error {
 	k8sClient, err := clients.Kubernetes.GetKubernetesClientset()
 	if err != nil {

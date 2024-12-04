@@ -3,13 +3,13 @@ module github.com/NorskHelsenett/ror-agent/v2
 go 1.23.1
 
 require (
-	github.com/NorskHelsenett/ror v0.3.11-rc3
+	github.com/NorskHelsenett/ror v0.3.12-rc1
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-resty/resty/v2 v2.16.0
 	github.com/spf13/viper v1.19.0
 	go.uber.org/automaxprocs v1.6.0
-	k8s.io/apimachinery v0.31.2
-	k8s.io/client-go v0.31.2
+	k8s.io/apimachinery v0.31.3
+	k8s.io/client-go v0.31.3
 )
 
 require (
@@ -84,10 +84,10 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.31.2 // indirect
+	k8s.io/api v0.31.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
-	k8s.io/metrics v0.31.2 // indirect
+	k8s.io/metrics v0.31.3 // indirect
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	sigs.k8s.io/controller-runtime v0.19.1 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

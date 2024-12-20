@@ -420,7 +420,7 @@ func getControlPlaneEndpoint(clientset *kubernetes.Clientset) (string, error) {
 		return "", errors.New(errMsg)
 	}
 	for _, node := range nodes.Items {
-		if endpoint, ok := node.Labels["ror.io/api-endpoint-addr"]; ok {
+		if endpoint, ok := node.Annotations["ror.io/api-endpoint-addr"]; ok {
 			return endpoint, nil
 		}
 	}

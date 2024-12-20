@@ -87,6 +87,9 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 				if node.Provider == "tanzu" {
 					k8sControlPlaneEndpoint, _ = getControlPlaneEndpoint(k8sClient)
 				}
+				if node.Provider == providers.ProviderTypeTalos {
+					k8sControlPlaneEndpoint, _ = getControlPlaneEndpoint(k8sClient)
+				}
 			} else {
 				appendNodeToNodePools(&nodePools, &node)
 			}
@@ -409,6 +412,19 @@ func appendNodeToNodePools(nodePools *[]apicontracts.NodePool, node *k8smodels.N
 }
 
 func getControlPlaneEndpoint(clientset *kubernetes.Clientset) (string, error) {
+
+	nodes, err := nodeservice.GetNodes(clientset, nil)
+
+	if err != nil {
+		errMsg := "getControlPlaneEndpoint: Could not get nodes from k8s"
+		return "", errors.New(errMsg)
+	}
+	for _, node := range nodes {
+		if endpoint, ok := node.Labels["ror.io/api-endpoint-addr"]; ok {
+			return endpoint, nil
+		}
+	}
+
 	kubeadmConfigMap, err := clientset.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "kubeadm-config", v1.GetOptions{})
 	if err != nil {
 		errMsg := "getControlPlaneEndpoint: Could not get cluster config from kube-system/kubeadm-config, check rbac"

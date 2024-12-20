@@ -413,13 +413,13 @@ func appendNodeToNodePools(nodePools *[]apicontracts.NodePool, node *k8smodels.N
 
 func getControlPlaneEndpoint(clientset *kubernetes.Clientset) (string, error) {
 
-	nodes, err := nodeservice.GetNodes(clientset, nil)
+	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{})
 
 	if err != nil {
 		errMsg := "getControlPlaneEndpoint: Could not get nodes from k8s"
 		return "", errors.New(errMsg)
 	}
-	for _, node := range nodes {
+	for _, node := range nodes.Items {
 		if endpoint, ok := node.Labels["ror.io/api-endpoint-addr"]; ok {
 			return endpoint, nil
 		}

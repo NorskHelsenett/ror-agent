@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/k8smodels"
@@ -76,7 +77,14 @@ func GetNodes(k8sClient *kubernetes.Clientset, metricsClient *metrics.Clientset)
 		if err == nil {
 			cpuUsage := nodeMetrics.Usage.Cpu()
 			cpuAllocated, _ := node.Status.Allocatable.Cpu().AsInt64()
-
+			if cpuAllocated == 0 {
+				cpudec := node.Status.Allocatable.Cpu().AsDec()
+				rounded := cpudec.UnscaledBig().Int64()
+				if err != nil {
+					rlog.Error("could not convert cpu to int", err)
+				}
+				cpuAllocated = int64(math.Round(float64(rounded) / 1000))
+			}
 			memoryUsageInt, _ := nodeMetrics.Usage.Memory().AsInt64()
 			memoryAllocated := node.Status.Allocatable.Memory().Value()
 

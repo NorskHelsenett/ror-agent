@@ -342,7 +342,7 @@ func appendNodeToNodePools(nodePools *[]apicontracts.NodePool, node *k8smodels.N
 	rlog.Debug("", rlog.Strings("machine name split", machineNameSplit))
 	var workerName string
 	if node.Provider == providers.ProviderTypeTalos {
-		workerName = node.Name
+		workerName = node.Annotations["ror.io/node-pool"]
 	} else if node.Provider != providers.ProviderTypeAks {
 		workerName = machineNameSplit[len(clusterNameSplit)]
 	} else {

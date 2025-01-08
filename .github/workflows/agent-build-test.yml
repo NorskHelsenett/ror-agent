@@ -1,0 +1,36 @@
+name: Build Cluster Agent v1
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'v2/**'
+      - '.github/workflows/agentv2.yml'
+      - 'charts/ror-cluster-agent-v2/**'
+env:
+  APP: agent
+  APP_PATH: cmd/agent
+jobs:
+  build-app:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+    - name: Test
+      run: |
+          echo testing...
+          go get -t ./...
+          go vet ./...
+          go test -v ./...
+    - name: Build
+      run: |
+        echo building v1...
+        export SHA_SHORT=$(git rev-parse --short HEAD)
+        export LIB_VER=$(cat go.mod | grep "github.com/NorskHelsenett/ror " | cut -d' ' -f2)
+        go get ./...
+        CGO_ENABLED=0 go build -o dist/${{ env.APP }} -ldflags "-w -extldflags '-static' -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Version=$ROR_VERSION -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Commit=$SHA_SHORT -X github.com/NorskHelsenett/ror/pkg/config/rorversion.LibVer=$LIB_VER" ${{ env.APP_PATH }}/main.go
+      env:
+        ROR_VERSION: v0.0.1-build

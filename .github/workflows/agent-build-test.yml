@@ -12,6 +12,8 @@ env:
   APP_PATH: cmd/agent
 jobs:
   build-app:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3

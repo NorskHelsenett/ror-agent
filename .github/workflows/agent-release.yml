@@ -1,0 +1,152 @@
+name: Release Cluster Agent v1
+
+on:
+  push:
+    tags: ["v1", "v1.[0-9]+", "v1.[0-9]+.[0-9]+", "v1.[0-9]+.[0-9]+-*"]
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: norskhelsenett/ror-cluster-agent
+  APP: ror-cluster-agent
+  APP_PATH: cmd/agent
+jobs:
+  setenv:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      rorversion: ${{ steps.env.outputs.ROR_VERSION }}
+      shortsha: ${{ steps.env.outputs.SHA_SHORT }}
+      libver: ${{ steps.env.outputs.LIB_VER }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: env
+        name: Set env
+        run: |
+          echo "ROR_VERSION=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "LIB_VER=$(cat go.mod | grep 'github.com/NorskHelsenett/ror ' | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+  build-app:
+    permissions:
+      contents: read
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    needs: setenv
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+    - name: Start build
+      run: |
+        echo "Building ${{ env.APP }} ${{ needs.setenv.outputs.rorversion}} (${{ needs.setenv.outputs.shortsha}})"
+    - name: Build
+      run: |
+          go get ./...
+          mkdir -p dist/isbuilt
+          CGO_ENABLED=0 go build -o dist/${{ env.APP }} -ldflags "-w -extldflags '-static' -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Version=${{ needs.setenv.outputs.rorversion}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Commit=${{ needs.setenv.outputs.shortsha}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.LibVer=${{ needs.setenv.outputs.libver}}" ${{ env.APP_PATH }}/main.go
+          touch dist/isbuilt/${{ env.APP }}
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: binary-build
+        path: |
+          dist/${{ env.APP }}
+          dist/isbuilt/${{ env.APP }}
+        retention-days: 1
+  build-container-image:
+    runs-on: ubuntu-latest
+    #if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+    needs: 
+      - build-app
+      - setenv
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download binary build artifacts
+        uses: actions/download-artifact@v4
+      - name: Check env
+        run: |
+          echo "Building container ${{ env.APP }} ${{ needs.setenv.outputs.rorversion}} (${{ needs.setenv.outputs.shortsha}})"
+      - name: Move artifacts
+        run: |
+          mv binary-build dist
+          chmod +x dist/${{ env.APP }}
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=latestv1
+            type=raw,value=${{ needs.setenv.outputs.rorversion }}
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Sign the published Docker image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+  publish-helm:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    needs: 
+      - build-container-image
+      - setenv
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check env
+        run: |
+          echo "Building helm chart for ${{ env.APP }} ${{ needs.setenv.outputs.rorversion }} (${{ needs.setenv.outputs.shortsha}})"
+      - name: Install helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.15.0
+      - name: install-yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY}.tar.gz -O - | tar xz && mv ${BINARY} yq && chmod +x yq
+        env:
+          VERSION: v4.44.5
+          BINARY: yq_linux_amd64
+      - name: Build helm chart
+        run: |
+          export HELM_VERSION=${ROR_VERSION#v*}
+          ./yq e -i '.version = strenv(HELM_VERSION),.appVersion = strenv(ROR_VERSION)' charts/ror-cluster-agent-v1/Chart.yaml
+          ./yq e -i '.image.tag = strenv(ROR_VERSION),.image.repository = "ghcr.io/norskhelsenett/${{ env.APP }}"' charts/ror-cluster-agent-v1/values.yaml
+          helm package charts/ror-cluster-agent-v1
+          echo  ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ${{ env.REGISTRY }} --password-stdin
+          helm push ${{ env.APP }}-${HELM_VERSION}.tgz oci://${{ env.REGISTRY }}/norskhelsenett/helm/
+        env:
+          ROR_VERSION: ${{ needs.setenv.outputs.rorversion }}

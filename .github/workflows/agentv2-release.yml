@@ -131,7 +131,7 @@ jobs:
         run: |
           echo "Building helm chart for ${{ env.APP }} ${{ needs.setenv.outputs.rorversion }} (${{ needs.setenv.outputs.shortsha}})"
       - name: Install helm
-        uses: azure/setup-helm@v1
+        uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814
         with:
           version: v3.15.0
       - name: install-yq

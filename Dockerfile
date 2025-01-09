@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.description ROR Agent v1
 WORKDIR /
 
 COPY cmd/agent/version.json /version.json
-COPY dist/agent /bin/ror-agent
+COPY dist/ror-cluster-agent /bin/ror-agent
 USER 10000:10000
 EXPOSE 8100
 

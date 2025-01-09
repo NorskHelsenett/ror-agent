@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source="https://github.com/norskhelsenett/ror-age
 LABEL org.opencontainers.image.description="ROR Agent v2"
 WORKDIR /
 
-COPY dist/agent /bin/ror-cluster-agent
+COPY dist/ror-cluster-agent /bin/ror-cluster-agent
 USER 10000:10000
 EXPOSE 8100
 

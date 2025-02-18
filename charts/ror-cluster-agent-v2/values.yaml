@@ -8,7 +8,7 @@ image:
   tag: "2.0.1"
 imagePullSecrets: []
 nameOverride: ""
-fullnameOverride: "ror-cluster-agent-v2"
+fullnameOverride: "ror-cluster-agent"
 serviceAccount:
   create: true
   name: ror-cluster-agent-sa

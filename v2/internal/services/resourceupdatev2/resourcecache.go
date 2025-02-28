@@ -80,6 +80,10 @@ func (rc *resourcecache) finnishCleanup() {
 	rorclient := clients.RorConfig.GetRorClient()
 	for _, uid := range inactive {
 		rlog.Info(fmt.Sprintf("Removing resource %s", uid))
+		if uid == "" {
+			rlog.Warn("resource uid is empty")
+			continue
+		}
 		_, err := rorclient.ResourceV2().Delete(context.Background(), uid)
 		if err != nil {
 			rlog.Error(fmt.Sprintf("Error removing resource %s", uid), err)

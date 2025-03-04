@@ -131,86 +131,20 @@ func (rj rorResourceJson) getResource(resourceReturn *rorResource) error {
 		return err
 	}
 
-	if resourceReturn.ApiVersion == "run.tanzu.vmware.com/v1alpha2" && resourceReturn.Kind == "TanzuKubernetesCluster" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceTanzuKubernetesCluster](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "run.tanzu.vmware.com/v1alpha2" && resourceReturn.Kind == "TanzuKubernetesRelease" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceTanzuKubernetesRelease](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "vmoperator.vmware.com/v1alpha1" && resourceReturn.Kind == "VirtualMachineClass" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceVirtualMachineClass](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "vmoperator.vmware.com/v1alpha1" && resourceReturn.Kind == "VirtualMachineClassBinding" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceVirtualMachineClassBinding](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "KubernetesCluster" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceKubernetesCluster](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "ClusterOrder" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceClusterOrder](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "Project" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceProject](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "Configuration" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceConfiguration](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
 	if resourceReturn.ApiVersion == "aquasecurity.github.io/v1alpha1" && resourceReturn.Kind == "ClusterComplianceReport" {
 		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceClusterComplianceReport](bytes)
 		resourceReturn.Resource = payload
 		return err
 	}
 
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "ClusterVulnerabilityReport" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceClusterVulnerabilityReport](bytes)
+	if resourceReturn.ApiVersion == "v1" && resourceReturn.Kind == "Endpoints" {
+		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceEndpoints](bytes)
 		resourceReturn.Resource = payload
 		return err
 	}
 
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "Route" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceRoute](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "SlackMessage" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceSlackMessage](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "VulnerabilityEvent" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceVulnerabilityEvent](bytes)
-		resourceReturn.Resource = payload
-		return err
-	}
-
-	if resourceReturn.ApiVersion == "general.ror.internal/v1alpha1" && resourceReturn.Kind == "VirtualMachine" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceVirtualMachine](bytes)
+	if resourceReturn.ApiVersion == "networking.k8s.io/v1" && resourceReturn.Kind == "NetworkPolicy" {
+		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceNetworkPolicy](bytes)
 		resourceReturn.Resource = payload
 		return err
 	}

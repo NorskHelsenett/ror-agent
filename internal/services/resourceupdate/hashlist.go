@@ -1,4 +1,4 @@
-package resourceupdatev2
+package resourceupdate
 
 import (
 	"github.com/NorskHelsenett/ror/pkg/rlog"

@@ -13,7 +13,7 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/httpserver"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
-	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdatev2"
+	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
 
 	"github.com/NorskHelsenett/ror-agent/internal/checks/initialchecks"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/operator/initialize"
@@ -97,7 +97,7 @@ func main() {
 	}
 	viper.Set(configconsts.CLUSTER_ID, clusterId)
 
-	err = resourceupdatev2.ResourceCache.Init()
+	err = resourceupdate.ResourceCache.Init()
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}

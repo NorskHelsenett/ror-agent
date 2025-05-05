@@ -1,5 +1,5 @@
-github.com/NorskHelsenett/ror v1.1.3-rc9 h1:I0LGifOnu28SkkjEW0eZjH5l1syHNERhxjwA2stVFyQ=
-github.com/NorskHelsenett/ror v1.1.3-rc9/go.mod h1:wgZJwXujcpE9N099CwxvkRaXUZf+yJ5Qaf4Tabh6A0w=
+github.com/NorskHelsenett/ror v1.1.3-rc10 h1:TNw0Tqx35mkEPq39fhslVswFX9OfZrCpW0IWFZcpkxw=
+github.com/NorskHelsenett/ror v1.1.3-rc10/go.mod h1:e6m5ODlxP9xj5kT5OxyHB9aL7U3JBlayS6JJe7hv2dE=
 github.com/bytedance/sonic v1.13.2 h1:8/H1FempDZqC4VqjptGo14QQlJx8VdZJegxs6wwfqpQ=
 github.com/bytedance/sonic v1.13.2/go.mod h1:o68xyaF9u2gvVBuGHPlUVCy+ZfmNNO5ETf1+KgkJhz4=
 github.com/bytedance/sonic/loader v0.1.1/go.mod h1:ncP89zfokxS5LZrJxl5z0UJcsk4M4yY2JpfqGeCtNLU=

@@ -1,3 +1,6 @@
+// Package utils provides utility functions for the ROR agent.
+// It contains helper functions for handling Kubernetes resources
+// and managing their representation in the ROR system.
 package utils
 
 import (
@@ -16,7 +19,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-func GetIngressDetails(ingress *networkingV1.Ingress) (*apicontracts.Ingress, error) {
+// GetIngressDetails extracts information from a Kubernetes Ingress resource and converts it to an apicontracts.Ingress.
+// It gathers details about the Ingress rules, associated services, IP addresses, and paths.
+// The function also evaluates the health status of the ingress based on its configuration.
+//
+// Parameters:
+//   - ctx: Context for the operation.
+//   - ingress: Pointer to a Kubernetes Ingress resource to extract information from.
+//
+// Returns:
+//   - *apicontracts.Ingress: A pointer to the constructed Ingress object with complete details.
+//   - error: An error if the ingress is invalid or if there was a problem fetching related information.
+func GetIngressDetails(ctx context.Context, ingress *networkingV1.Ingress) (*apicontracts.Ingress, error) {
 	var newIngress apicontracts.Ingress
 	ingressNameSpace := ingress.Namespace
 	ingressName := ingress.Name
@@ -33,6 +47,7 @@ func GetIngressDetails(ingress *networkingV1.Ingress) (*apicontracts.Ingress, er
 	k8sClient, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		rlog.Error("error in config", err)
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
 	if ingress.Spec.Rules == nil {
@@ -57,14 +72,24 @@ func GetIngressDetails(ingress *networkingV1.Ingress) (*apicontracts.Ingress, er
 			}
 		}
 
+		// Check if HTTP is nil before trying to access its Paths
+		if irule.IngressRuleValue.HTTP == nil {
+			rlog.Debug("Ingress rule has no HTTP paths defined",
+				rlog.String("ingress", ingress.Name),
+				rlog.String("host", irule.Host))
+			continue
+		}
+
 		for _, irulepath := range irule.IngressRuleValue.HTTP.Paths {
 			rlog.Debug("rule for path", rlog.String("path", irulepath.Path))
 			rlog.Debug("", rlog.String("service", irulepath.Backend.Service.Name))
-			service, err := GetIngressService(k8sClient, ingressNameSpace, irulepath.Backend.Service.Name)
+			service, err := GetIngressService(ctx, k8sClient, ingressNameSpace, irulepath.Backend.Service.Name)
 			if err != nil {
+				// Log the error and continue with an empty service, or handle as appropriate
+				rlog.Error("failed to get ingress service details", err, rlog.String("service", irulepath.Backend.Service.Name))
 				rules[ruleindex].Paths = append(rules[ruleindex].Paths, apicontracts.IngressPath{
 					Path:    irulepath.Path,
-					Service: apicontracts.Service{},
+					Service: apicontracts.Service{}, // Empty service
 				})
 				continue
 			}
@@ -87,6 +112,16 @@ func GetIngressDetails(ingress *networkingV1.Ingress) (*apicontracts.Ingress, er
 	return GetIngressHealth(newIngress)
 }
 
+// GetIngressHealth evaluates the health status of an Ingress resource based on predefined criteria.
+// It checks for valid ingress class, presence of rules, IP addresses, paths, and service configurations.
+// Health status is updated in the Ingress object itself.
+//
+// Parameters:
+//   - thisIngress: The apicontracts.Ingress object to evaluate health for.
+//
+// Returns:
+//   - *apicontracts.Ingress: A pointer to the same Ingress object with updated health status.
+//   - error: Error if any issues occur during health evaluation.
 func GetIngressHealth(thisIngress apicontracts.Ingress) (*apicontracts.Ingress, error) {
 
 	ingressClasses := []string{"internett", "helsenett", "datacenter"}
@@ -109,7 +144,8 @@ func GetIngressHealth(thisIngress apicontracts.Ingress) (*apicontracts.Ingress, 
 					if path.Service.Type != "NodePort" {
 						thisIngress.Health = 3
 					}
-					if len(path.Service.Endpoints) < 0 {
+					// Corrected condition: check if there are no endpoints
+					if len(path.Service.Endpoints) == 0 {
 						thisIngress.Health = 3
 					}
 				}
@@ -121,23 +157,32 @@ func GetIngressHealth(thisIngress apicontracts.Ingress) (*apicontracts.Ingress, 
 
 }
 
-func GetIngressService(k8sClient *kubernetes.Clientset, namespace string, serviceName string) (apicontracts.Service, error) {
+// GetIngressService retrieves detailed information about a Kubernetes Service associated with an Ingress.
+// It fetches service details including type, ports, selectors, and endpoints.
+//
+// Parameters:
+//   - ctx: Context for the operation.
+//   - k8sClient: Kubernetes client to use for API calls.
+//   - namespace: Namespace where the service is located.
+//   - serviceName: Name of the service to retrieve information for.
+//
+// Returns:
+//   - apicontracts.Service: A Service object containing details about the requested service.
+//   - error: Error if any issues occur while retrieving service information.
+func GetIngressService(ctx context.Context, k8sClient *kubernetes.Clientset, namespace string, serviceName string) (apicontracts.Service, error) {
 
 	var service apicontracts.Service
 	var endpoints []apicontracts.EndpointAddress
 	var ports []apicontracts.ServicePort
 
 	listOptions := metav1.ListOptions{}
-	svcs, err := k8sClient.CoreV1().Services(namespace).List(context.TODO(), listOptions)
+	svcs, err := k8sClient.CoreV1().Services(namespace).List(ctx, listOptions)
 	if err != nil {
-		rlog.Fatal("could not list svcs", err)
+		rlog.Error("could not list svcs", err, rlog.String("namespace", namespace))
+		return apicontracts.Service{}, fmt.Errorf("failed to list services in namespace %s: %w", namespace, err)
 	}
 	for _, svc := range svcs.Items {
 		if svc.Name == serviceName {
-			// if svc.Spec.Type != "NodePort" {
-			// 	health = 3
-			// }
-
 			for _, port := range svc.Spec.Ports {
 				ports = append(ports, apicontracts.ServicePort{
 					Name:     port.Name,
@@ -168,9 +213,10 @@ func GetIngressService(k8sClient *kubernetes.Clientset, namespace string, servic
 		rlog.Debug("Could not find Service", rlog.String("service name", serviceName))
 	}
 
-	eps, _ := k8sClient.CoreV1().Endpoints(namespace).List(context.TODO(), listOptions)
+	eps, err := k8sClient.CoreV1().Endpoints(namespace).List(ctx, listOptions)
 	if err != nil {
-		rlog.Fatal("could not list eps", err)
+		rlog.Error("could not list eps", err, rlog.String("namespace", namespace))
+		return service, fmt.Errorf("failed to list endpoints in namespace %s for service %s: %w", namespace, serviceName, err)
 	}
 	for _, ep := range eps.Items {
 		if ep.Name != serviceName {

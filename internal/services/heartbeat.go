@@ -187,7 +187,7 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 
 func getIngresses(k8sClient *kubernetes.Clientset) ([]apicontracts.Ingress, error) {
 	var ingressList []apicontracts.Ingress
-	nsList, err := k8sClient.CoreV1().Namespaces().List(context.TODO(), v1.ListOptions{})
+	nsList, err := k8sClient.CoreV1().Namespaces().List(context.Background(), v1.ListOptions{})
 	if err != nil {
 		rlog.Error("could not fetch namespaces", err)
 		return ingressList, errors.New("could not fetch namespaces from cluster")
@@ -195,14 +195,13 @@ func getIngresses(k8sClient *kubernetes.Clientset) ([]apicontracts.Ingress, erro
 
 	for _, namespace := range nsList.Items {
 		ing := k8sClient.NetworkingV1().Ingresses(namespace.Name)
-		ingresses, err := ing.List(context.TODO(), v1.ListOptions{})
+		ingresses, err := ing.List(context.Background(), v1.ListOptions{})
 		if err != nil {
 			rlog.Error("could not list ingress in namespace", err, rlog.String("namespace", namespace.Name))
 			continue
 		}
 		for _, ingress := range ingresses.Items {
-
-			richIngress, err := utils.GetIngressDetails(&ingress)
+			richIngress, err := utils.GetIngressDetails(context.Background(), &ingress)
 			if err != nil {
 				rlog.Error("could not enrich ingress", err,
 					rlog.String("ingress", ingress.Name),

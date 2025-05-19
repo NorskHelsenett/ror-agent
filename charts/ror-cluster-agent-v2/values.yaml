@@ -10,9 +10,11 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: "ror-cluster-agent"
 serviceAccount:
-  create: true
+  create: false
   name: ror-cluster-agent-sa
 podAnnotations: {}
+rbac:
+  create: false
 podSecurityContext:
   runAsNonRoot: true
   fsGroup: 2000

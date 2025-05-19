@@ -1,7 +1,9 @@
+{{- if .Values.rbac.create }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: ror-cluster-agent:config-reader-crb
+  name: {{ include "ror-cluster-agent.fullname" . }}:config-reader-crb
 subjects:
 - kind: ServiceAccount
   name: {{ include "ror-cluster-agent.serviceAccountName" . }}
@@ -10,20 +12,6 @@ roleRef:
   kind: ClusterRole
   name: {{ include "ror-cluster-agent.fullname" . }}:config-read-cr
   apiGroup: rbac.authorization.k8s.io
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "ror-cluster-agent.fullname" . }}-restricted-psp
-  namespace: {{.Release.Namespace}}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: psp:vmware-system-restricted
-subjects:
-- kind: ServiceAccount
-  name: {{ include "ror-cluster-agent.serviceAccountName" . }}
-  namespace: {{.Release.Namespace}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -38,3 +26,4 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "ror-cluster-agent.serviceAccountName" . }}
   namespace: {{.Release.Namespace}}
+{{- end }}

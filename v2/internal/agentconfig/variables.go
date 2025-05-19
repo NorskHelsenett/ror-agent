@@ -30,9 +30,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	VersionDefault = "0.1.2"
+	CommitDefault  = "FFFFF"
+)
+
 var (
-	Version string = "1.1.0"
-	Commit  string = "FFFFF"
+	version = rorversion.NewRorVersion(VersionDefault, CommitDefault)
 )
 
 var (
@@ -42,23 +46,26 @@ var (
 func Init() {
 	rlog.InitializeRlog()
 	rlog.Info("Configuration initializing ...")
-	viper.SetDefault(configconsts.VERSION, Version)
+	viper.SetDefault(configconsts.VERSION, VersionDefault)
 	viper.SetDefault(configconsts.ROLE, "ClusterAgent")
-	viper.SetDefault(configconsts.COMMIT, Commit)
-	viper.SetDefault(configconsts.HEALTH_ENDPOINT, ":8100")
+	viper.SetDefault(configconsts.COMMIT, CommitDefault)
 	viper.SetDefault(configconsts.POD_NAMESPACE, "ror")
 	viper.SetDefault(configconsts.API_KEY_SECRET, "ror-apikey")
 	viper.SetDefault(configconsts.HEALTH_ENDPOINT, ":9998")
 	viper.AutomaticEnv()
+	version = rorversion.NewRorVersion(viper.GetString(configconsts.VERSION), viper.GetString(configconsts.COMMIT))
+	viper.Set(configconsts.VERSION, version.Version)
+	viper.Set(configconsts.COMMIT, version.Commit)
 }
 
 func IncreaseErrorCount() {
 	ErrorCount++
 }
+
 func ResetErrorCount() {
 	ErrorCount = 0
 }
 
 func GetRorVersion() rorversion.RorVersion {
-	return rorversion.NewRorVersion(viper.GetString(configconsts.VERSION), viper.GetString(configconsts.COMMIT))
+	return version
 }

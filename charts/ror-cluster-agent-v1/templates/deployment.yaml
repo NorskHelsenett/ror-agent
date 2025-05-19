@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ror-cluster-agent.fullname" . }}
+  name: {{ include "ror-cluster-agent.fullname" . }}-v1
   labels:
     {{- include "ror-cluster-agent.labels" . | nindent 4 }}
 spec:

@@ -31,6 +31,72 @@ import (
 
 var MissingConst = "Missing ..."
 
+type accessGroups struct {
+	accessGroups          []string
+	readOnlyAccessGroups  []string
+	grafanaAdminGroups    []string
+	grafanaReadOnlyGroups []string
+	argocdAdminGroups     []string
+	argocdReadOnlyGroups  []string
+}
+
+func (a accessGroups) StringArray() []string {
+	var result []string
+	for _, group := range a.accessGroups {
+		if group != "" {
+			groupname := fmt.Sprintf("Cluster Operator - %s", group)
+			result = append(result, groupname)
+		}
+	}
+	for _, group := range a.readOnlyAccessGroups {
+		if group != "" {
+			groupname := fmt.Sprintf("Cluster ReadOnly - %s", group)
+			result = append(result, groupname)
+		}
+	}
+	for _, group := range a.grafanaAdminGroups {
+		if group != "" {
+			groupname := fmt.Sprintf("Grafana Operator - %s", group)
+			result = append(result, groupname)
+		}
+	}
+	for _, group := range a.grafanaReadOnlyGroups {
+		if group != "" {
+			groupname := fmt.Sprintf("Grafana ReadOnly - %s", group)
+			result = append(result, groupname)
+		}
+	}
+	for _, group := range a.argocdAdminGroups {
+		if group != "" {
+			groupname := fmt.Sprintf("ArgoCD Operator - %s", group)
+			result = append(result, groupname)
+		}
+	}
+	for _, group := range a.argocdReadOnlyGroups {
+		if group != "" {
+			groupname := fmt.Sprintf("ArgoCD ReadOnly - %s", group)
+			result = append(result, groupname)
+		}
+	}
+	return result
+}
+
+func NewAccessGroupsFromData(data map[string]string) accessGroups {
+	var accessGroups accessGroups
+	if data == nil {
+		return accessGroups
+	}
+
+	accessGroups.accessGroups = strings.Split(data["accessGroups"], ";")
+	accessGroups.readOnlyAccessGroups = strings.Split(data["readOnlyAccessGroups"], ";")
+	accessGroups.grafanaAdminGroups = strings.Split(data["grafanaAdminGroups"], ";")
+	accessGroups.grafanaReadOnlyGroups = strings.Split(data["grafanaReadOnlyGroups"], ";")
+	accessGroups.argocdAdminGroups = strings.Split(data["argocdAdminGroups"], ";")
+	accessGroups.argocdReadOnlyGroups = strings.Split(data["argocdReadOnlyGroups"], ";")
+
+	return accessGroups
+}
+
 func GetHeartbeatReport() (apicontracts.Cluster, error) {
 
 	k8sClient, err := clients.Kubernetes.GetKubernetesClientset()
@@ -217,7 +283,6 @@ func getIngresses(k8sClient *kubernetes.Clientset) ([]apicontracts.Ingress, erro
 }
 
 func getNhnToolingMetadata(k8sClient *kubernetes.Clientset, dynamicClient dynamic.Interface) (k8smodels.NhnTooling, error) {
-	var accessGroups []string
 	result := k8smodels.NhnTooling{
 		Version:      MissingConst,
 		Branch:       MissingConst,
@@ -241,10 +306,8 @@ func getNhnToolingMetadata(k8sClient *kubernetes.Clientset, dynamicClient dynami
 
 	environment := nhnToolingConfigMap.Data["environment"]
 	toolingVersion := nhnToolingConfigMap.Data["toolingVersion"]
-	accessGroupsValue := nhnToolingConfigMap.Data["accessGroups"]
-	if accessGroupsValue != "" {
-		accessGroups = strings.Split(accessGroupsValue, ";")
-	}
+
+	accessGroups := NewAccessGroupsFromData(nhnToolingConfigMap.Data)
 
 	if environment == "" {
 		environment = "dev"
@@ -267,7 +330,7 @@ func getNhnToolingMetadata(k8sClient *kubernetes.Clientset, dynamicClient dynami
 
 	result.Version = toolingVersion
 	result.Environment = environment
-	result.AccessGroups = accessGroups
+	result.AccessGroups = accessGroups.StringArray()
 	result.Branch = branch
 
 	return result, nil

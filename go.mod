@@ -2,10 +2,8 @@ module github.com/NorskHelsenett/ror-agent
 
 go 1.24.2
 
-replace github.com/dotse/go-health => github.com/dotse/go-health v0.2.6
-
 require (
-	github.com/NorskHelsenett/ror v1.1.3-rc10
+	github.com/NorskHelsenett/ror v1.2.0-rc5
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-resty/resty/v2 v2.16.5

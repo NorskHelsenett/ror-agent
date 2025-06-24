@@ -1,0 +1,11 @@
+
+version: 2
+updates:
+  - package-ecosystem: "gomod" # See documentation for possible values
+    directory: "/" # Locatiasddn of package manifests
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "gomod" # See documentation for possible values
+    directory: "/v2/" # Locatiasddn of package manifests
+    schedule:
+      interval: "weekly"

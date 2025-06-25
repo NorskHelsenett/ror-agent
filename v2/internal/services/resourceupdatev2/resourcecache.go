@@ -100,7 +100,7 @@ func (rc *resourcecache) RunWorkQeue() {
 	}
 	cacheworkqueue := rc.WorkQueue.ConsumeWorkQeue()
 	rorclient := clients.RorConfig.GetRorClient()
-	status, err := rorclient.ResourceV2().Update(context.Background(), *cacheworkqueue.ResourceSet)
+	status, err := rorclient.ResourceV2().Update(context.Background(), cacheworkqueue.ResourceSet)
 	if err != nil {
 		rlog.Error("error sending resources update to ror, added to retryQeue", err)
 		rc.WorkQueue.reQueue(cacheworkqueue)

@@ -363,6 +363,8 @@ func getNhnToolingInfo(dynamicClient dynamic.Interface) (argomodels.Application,
 		return result, err
 	}
 
+	appByteArray = nil // Clear the byte array to free up memory
+
 	if nhnTooling.Metadata.Name == "" {
 		return result, errors.New("could not find nhn-tooling application")
 	}

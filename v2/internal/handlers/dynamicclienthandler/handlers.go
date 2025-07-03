@@ -1,8 +1,6 @@
 package dynamicclienthandler
 
 import (
-	"runtime"
-
 	"github.com/NorskHelsenett/ror-agent/v2/internal/services/resourceupdatev2"
 	"github.com/NorskHelsenett/ror-agent/v2/pkg/clients/dynamicclient"
 
@@ -27,7 +25,7 @@ func (handler) AddResource(obj any) {
 	resourceupdatev2.SendResource(rortypes.K8sActionAdd, obj.(*unstructured.Unstructured).Object)
 
 	obj = nil
-	runtime.GC() // Suggest garbage collection to free up memory
+
 }
 
 func (handler) DeleteResource(obj any) {
@@ -35,8 +33,8 @@ func (handler) DeleteResource(obj any) {
 		return // Avoid memory leaks if obj is nil
 	}
 	resourceupdatev2.SendResource(rortypes.K8sActionDelete, obj.(*unstructured.Unstructured).Object)
-	obj = nil    // Clear the obj reference to avoid memory leaks
-	runtime.GC() // Suggest garbage collection to free up memory
+	obj = nil // Clear the obj reference to avoid memory leaks
+
 }
 
 func (handler) UpdateResource(_ any, obj any) {
@@ -44,6 +42,6 @@ func (handler) UpdateResource(_ any, obj any) {
 		return // Avoid memory leaks if obj is nil
 	}
 	resourceupdatev2.SendResource(rortypes.K8sActionUpdate, obj.(*unstructured.Unstructured).Object)
-	obj = nil    // Clear the obj reference to avoid memory leaks
-	runtime.GC() // Suggest garbage collection to free up memory
+	obj = nil // Clear the obj reference to avoid memory leaks
+
 }

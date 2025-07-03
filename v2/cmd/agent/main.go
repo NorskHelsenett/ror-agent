@@ -1,11 +1,14 @@
 package main
 
 import (
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 
 	"github.com/NorskHelsenett/ror-agent/v2/internal/agentconfig"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/clients"
+	"github.com/NorskHelsenett/ror-agent/v2/internal/handlers/clusterhandler"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/handlers/dynamicclienthandler"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/services/resourceupdatev2"
@@ -43,6 +46,16 @@ func main() {
 		MustInitializeKubernetes: true,
 	}
 
+	if viper.GetBool(configconsts.ENABLE_PPROF) {
+		go func() {
+			rlog.Info("Starting pprof server on port 6060")
+			err := http.ListenAndServe("localhost:6060", nil) // Start pprof server on localhost:6060
+			if err != nil {
+				rlog.Fatal("could not start pprof server", err)
+			}
+		}()
+	}
+
 	rlog.Info("Initializing health server")
 	_ = healthserver.Start(healthserver.ServerString(viper.GetString(configconsts.HEALTH_ENDPOINT)))
 
@@ -53,12 +66,20 @@ func main() {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 
+	rlog.Info("Starting cluster handler")
+	err = clusterhandler.Start()
+	if err != nil {
+		rlog.Fatal("could not start cluster handler", err)
+	}
+
+	rlog.Info("Starting dynamic client handler")
 	dynamicclienthandler := dynamicclienthandler.NewDynamicClientHandler()
 	err = dynamicclient.Start(clients.Kubernetes, dynamicclienthandler, stop, sigs)
 	if err != nil {
 		rlog.Fatal("could not start dynamic client", err)
 	}
 
+	rlog.Info("Starting schedulers")
 	scheduler.SetUpScheduler()
 
 	<-stop

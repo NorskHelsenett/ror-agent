@@ -1,6 +1,8 @@
 package dynamicclienthandler
 
 import (
+	"runtime"
+
 	"github.com/NorskHelsenett/ror-agent/v2/internal/services/resourceupdatev2"
 	"github.com/NorskHelsenett/ror-agent/v2/pkg/clients/dynamicclient"
 
@@ -19,16 +21,29 @@ func NewDynamicClientHandler() dynamicclient.DynamicClientHandler {
 }
 
 func (handler) AddResource(obj any) {
-	rawData := obj.(*unstructured.Unstructured)
-	resourceupdatev2.SendResource(rortypes.K8sActionAdd, rawData)
+	if obj == nil {
+		return // Avoid memory leaks if obj is nil
+	}
+	resourceupdatev2.SendResource(rortypes.K8sActionAdd, obj.(*unstructured.Unstructured).Object)
+
+	obj = nil
+	runtime.GC() // Suggest garbage collection to free up memory
 }
 
 func (handler) DeleteResource(obj any) {
-	rawData := obj.(*unstructured.Unstructured)
-	resourceupdatev2.SendResource(rortypes.K8sActionDelete, rawData)
+	if obj == nil {
+		return // Avoid memory leaks if obj is nil
+	}
+	resourceupdatev2.SendResource(rortypes.K8sActionDelete, obj.(*unstructured.Unstructured).Object)
+	obj = nil    // Clear the obj reference to avoid memory leaks
+	runtime.GC() // Suggest garbage collection to free up memory
 }
 
 func (handler) UpdateResource(_ any, obj any) {
-	rawData := obj.(*unstructured.Unstructured)
-	resourceupdatev2.SendResource(rortypes.K8sActionUpdate, rawData)
+	if obj == nil {
+		return // Avoid memory leaks if obj is nil
+	}
+	resourceupdatev2.SendResource(rortypes.K8sActionUpdate, obj.(*unstructured.Unstructured).Object)
+	obj = nil    // Clear the obj reference to avoid memory leaks
+	runtime.GC() // Suggest garbage collection to free up memory
 }

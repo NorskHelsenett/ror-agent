@@ -1,5 +1,5 @@
-github.com/NorskHelsenett/ror v1.2.1-rc3 h1:oJdjoJHAscMm0ct6lQd2wRPV6VMKPho4kHcnxP+m6es=
-github.com/NorskHelsenett/ror v1.2.1-rc3/go.mod h1:85lQ9od+fQCKwkvVHlILh2pz17qrcGO0F5/k4liZILo=
+github.com/NorskHelsenett/ror v1.2.1-rc4 h1:sRQ53lJDm5lTmnr2gJ2r1dD6pOivukLXO6X16CPh+j0=
+github.com/NorskHelsenett/ror v1.2.1-rc4/go.mod h1:85lQ9od+fQCKwkvVHlILh2pz17qrcGO0F5/k4liZILo=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bytedance/sonic v1.13.3 h1:MS8gmaH16Gtirygw7jV91pDCN33NyMrPbN7qiYhEsF0=

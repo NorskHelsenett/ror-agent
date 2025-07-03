@@ -8,12 +8,10 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func SendResource(action rortypes.ResourceAction, input *unstructured.Unstructured) {
-	rorres := rorkubernetes.NewResourceFromDynamicClient(input)
+func SendResource(action rortypes.ResourceAction, input map[string]interface{}) {
+	rorres := rorkubernetes.NewResourceFromMapInterface(input)
 	err := rorres.SetRorMeta(rortypes.ResourceRorMeta{
 		Version:  "v2",
 		Ownerref: clients.RorConfig.CreateOwnerref(),

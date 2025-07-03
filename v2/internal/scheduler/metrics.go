@@ -13,18 +13,15 @@ import (
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
+	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
 	apimachinery "k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/kubernetes"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func MetricsReporting() error {
-	k8sClient, err := clients.Kubernetes.GetKubernetesClientset()
-	if err != nil {
-		return err
-	}
 	var metricsReport apicontracts.MetricsReport
 
-	metricsReportNodes, err := CreateNodeMetricsList(k8sClient)
+	metricsReportNodes, err := CreateNodeMetricsList(clients.Kubernetes)
 	if err != nil {
 		rlog.Error("error converting podmetrics", err)
 		return err
@@ -84,34 +81,33 @@ func sendMetricsToRor(metricsReport apicontracts.MetricsReport) error {
 	return nil
 }
 
-func CreateNodeMetricsList(k8sClient *kubernetes.Clientset) ([]apicontracts.NodeMetric, error) {
-	var nodeMetricsList apicontracts.NodeMetricsList
+func CreateNodeMetricsList(k8sClient *kubernetesclient.K8sClientsets) ([]apicontracts.NodeMetric, error) {
+
 	var metricsReportNodes []apicontracts.NodeMetric
-
-	data, err := k8sClient.RESTClient().Get().AbsPath("apis/metrics.k8s.io/v1beta1/nodes").DoRaw(context.TODO())
+	metricsClient, err := k8sClient.GetMetricsV1Beta1Client()
 	if err != nil {
-		rlog.Error("error converting podmetrics", err)
 		return metricsReportNodes, err
 	}
 
-	err = json.Unmarshal(data, &nodeMetricsList)
+	nodeMetrics, err := metricsClient.NodeMetricses().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		rlog.Error("error unmarshaling podmetrics", err)
+		rlog.Error("error getting node metrics", err)
 		return metricsReportNodes, err
 	}
 
-	for _, node := range nodeMetricsList.Items {
-
-		metricsReportNode, err := CreateNodeMetrics(node)
-		if err != nil {
-			rlog.Error("error converting podmetrics", err)
-			return metricsReportNodes, err
+	// Process directly without additional JSON marshaling/unmarshaling
+	for _, node := range nodeMetrics.Items {
+		// Convert directly from the typed objects
+		metricsReportNode := apicontracts.NodeMetric{
+			Name:        node.Name,
+			TimeStamp:   node.Timestamp.Time,
+			CpuUsage:    node.Usage.Cpu().MilliValue(),
+			MemoryUsage: node.Usage.Memory().Value(),
 		}
 		metricsReportNodes = append(metricsReportNodes, metricsReportNode)
 	}
 
 	return metricsReportNodes, nil
-
 }
 
 func CreateNodeMetrics(node apicontracts.NodeMetricsListItem) (apicontracts.NodeMetric, error) {

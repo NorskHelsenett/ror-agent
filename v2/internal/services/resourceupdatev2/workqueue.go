@@ -46,6 +46,7 @@ func (wq *ResourceCacheWorkQueue) AddResourceSet(add *rorresources.ResourceSet) 
 	}
 }
 
+// TODO use reQueueResource to add resources to the work queue
 func (wq *ResourceCacheWorkQueue) reQueue(wqadd *ResourceCacheWorkQueue) {
 	faileduuids := ""
 	var failcount int

@@ -4,8 +4,8 @@ updates:
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "/" # Locatiasddn of package manifests
     schedule:
-      interval: "weekly"
+      interval: "daily"
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "/v2/" # Locatiasddn of package manifests
     schedule:
-      interval: "weekly"
+      interval: "daily"

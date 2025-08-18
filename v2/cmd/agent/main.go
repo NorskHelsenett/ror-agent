@@ -11,11 +11,11 @@ import (
 	"github.com/NorskHelsenett/ror-agent/v2/internal/handlers/clusterhandler"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/handlers/dynamicclienthandler"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/scheduler"
-	"github.com/NorskHelsenett/ror-agent/v2/internal/services/resourceupdatev2"
 	"github.com/NorskHelsenett/ror-agent/v2/pkg/clients/dynamicclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorclientconfig"
+	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
 
 	healthserver "github.com/NorskHelsenett/ror/pkg/helpers/rorhealth/server"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
@@ -28,6 +28,7 @@ import (
 )
 
 func main() {
+	var err error
 	_ = "rebuild 12"
 	_, _ = maxprocs.Set(maxprocs.Logger(rlog.Infof))
 	agentconfig.Init()
@@ -59,9 +60,13 @@ func main() {
 	rlog.Info("Initializing health server")
 	_ = healthserver.Start(healthserver.ServerString(viper.GetString(configconsts.HEALTH_ENDPOINT)))
 
-	clients.InitClients(clientConfig)
+	rorClientInterface, err := clients.GetRorClientInterface()
+	if err != nil {
+		rlog.Fatal("could not get RorClientInterface", err)
+	}
 
-	err := resourceupdatev2.ResourceCache.Init()
+	clients.ResourceCache, err = resourcecache.NewResourceCache(resourcecache.ResourceCacheConfig{WorkQueueInterval: 10, RorClient: rorClientInterface})
+
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}

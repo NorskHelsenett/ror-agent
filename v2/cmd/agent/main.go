@@ -14,7 +14,6 @@ import (
 	"github.com/NorskHelsenett/ror-agent/v2/pkg/clients/dynamicclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
-	"github.com/NorskHelsenett/ror/pkg/config/rorclientconfig"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
 
 	healthserver "github.com/NorskHelsenett/ror/pkg/helpers/rorhealth/server"
@@ -37,16 +36,6 @@ func main() {
 	stop := make(chan struct{})                                        // Create channel to receive stop signal
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT) // Register the sigs channel to receieve SIGTERM
 
-	clientConfig := rorclientconfig.ClientConfig{
-		Role:                     viper.GetString(configconsts.ROLE),
-		Namespace:                viper.GetString(configconsts.POD_NAMESPACE),
-		ApiKeySecret:             viper.GetString(configconsts.API_KEY_SECRET),
-		ApiKey:                   viper.GetString(configconsts.API_KEY),
-		ApiEndpoint:              viper.GetString(configconsts.API_ENDPOINT),
-		RorVersion:               agentconfig.GetRorVersion(),
-		MustInitializeKubernetes: true,
-	}
-
 	if viper.GetBool(configconsts.ENABLE_PPROF) {
 		go func() {
 			rlog.Info("Starting pprof server on port 6060")
@@ -60,12 +49,12 @@ func main() {
 	rlog.Info("Initializing health server")
 	_ = healthserver.Start(healthserver.ServerString(viper.GetString(configconsts.HEALTH_ENDPOINT)))
 
-	rorClientInterface, err := clients.GetRorClientInterface()
+	rorClientInterface, err := clients.NewRorClientInterface()
 	if err != nil {
 		rlog.Fatal("could not get RorClientInterface", err)
 	}
 
-	clients.ResourceCache, err = resourcecache.NewResourceCache(resourcecache.ResourceCacheConfig{WorkQueueInterval: 10, RorClient: rorClientInterface})
+	resourceCache, err := resourcecache.NewResourceCache(resourcecache.ResourceCacheConfig{WorkQueueInterval: 10, RorClient: rorClientInterface})
 
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
@@ -78,14 +67,14 @@ func main() {
 	}
 
 	rlog.Info("Starting dynamic client handler")
-	dynamicclienthandler := dynamicclienthandler.NewDynamicClientHandler()
-	err = dynamicclient.Start(clients.Kubernetes, dynamicclienthandler, stop, sigs)
+	dynamicclienthandler := dynamicclienthandler.NewDynamicClientHandler(resourceCache)
+	err = dynamicclient.Start(rorClientInterface.GetKubernetesClientSet(), dynamicclienthandler, stop, sigs)
 	if err != nil {
 		rlog.Fatal("could not start dynamic client", err)
 	}
 
 	rlog.Info("Starting schedulers")
-	scheduler.SetUpScheduler()
+	scheduler.SetUpScheduler(rorClientInterface)
 
 	<-stop
 	rlog.Info("Shutting down...")

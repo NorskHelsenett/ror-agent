@@ -6,5 +6,5 @@ import (
 )
 
 func (handler) GetSchemas() []schema.GroupVersionResource {
-	return rordefs.GetSchemasByType(rordefs.ApiResourceTypeAgent)
+	return rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent)
 }

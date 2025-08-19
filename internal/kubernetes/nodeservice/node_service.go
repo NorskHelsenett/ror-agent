@@ -12,7 +12,7 @@ import (
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/providerinterregationreport"
-	"github.com/NorskHelsenett/ror/pkg/models/providers"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
@@ -50,17 +50,17 @@ func GetNodes(k8sClient *kubernetes.Clientset, metricsClient *metrics.Clientset)
 		n.Labels = node.Labels
 
 		switch report.GetProvider() {
-		case providers.ProviderTypeTanzu:
+		case providermodels.ProviderTypeTanzu:
 			fillNodeTanzu(&n)
-		case providers.ProviderTypeAks:
+		case providermodels.ProviderTypeAks:
 			fillNodeAzure(&n)
-		case providers.ProviderTypeK3d:
+		case providermodels.ProviderTypeK3d:
 			fillNodeK3d(&n)
-		case providers.ProviderTypeKind:
+		case providermodels.ProviderTypeKind:
 			fillNodeKind(&n)
-		case providers.ProviderTypeGke:
+		case providermodels.ProviderTypeGke:
 			fillNodeGke(&n)
-		case providers.ProviderTypeTalos:
+		case providermodels.ProviderTypeTalos:
 			fillNodeTalos(&n)
 		default:
 			fillNodeDefault(&n)
@@ -80,9 +80,6 @@ func GetNodes(k8sClient *kubernetes.Clientset, metricsClient *metrics.Clientset)
 			if cpuAllocated == 0 {
 				cpudec := node.Status.Allocatable.Cpu().AsDec()
 				rounded := cpudec.UnscaledBig().Int64()
-				if err != nil {
-					rlog.Error("could not convert cpu to int", err)
-				}
 				cpuAllocated = int64(math.Round(float64(rounded) / 1000))
 			}
 			memoryUsageInt, _ := nodeMetrics.Usage.Memory().AsInt64()

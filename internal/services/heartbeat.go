@@ -15,9 +15,9 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/utils"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
-	"github.com/NorskHelsenett/ror/pkg/models/providers"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
@@ -116,7 +116,7 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 	clusterName := "localhost"
 	workspaceName := "localhost"
 	datacenterName := "local"
-	provider := providers.ProviderTypeUnknown
+	provider := providermodels.ProviderTypeUnknown
 
 	nhnToolingMetadata, err := getNhnToolingMetadata(k8sClient, dynamicClient)
 	if err != nil {
@@ -153,7 +153,7 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 				if node.Provider == "tanzu" {
 					k8sControlPlaneEndpoint, _ = getControlPlaneEndpoint(k8sClient)
 				}
-				if node.Provider == providers.ProviderTypeTalos {
+				if node.Provider == providermodels.ProviderTypeTalos {
 					k8sControlPlaneEndpoint, _ = getControlPlaneEndpoint(k8sClient)
 				}
 			} else {
@@ -408,9 +408,9 @@ func appendNodeToNodePools(nodePools *[]apicontracts.NodePool, node *k8smodels.N
 	machineNameSplit := strings.Split(node.MachineName, "-")
 	rlog.Debug("", rlog.Strings("machine name split", machineNameSplit))
 	var workerName string
-	if node.Provider == providers.ProviderTypeTalos {
+	if node.Provider == providermodels.ProviderTypeTalos {
 		workerName = node.Annotations["ror.io/node-pool"]
-	} else if node.Provider != providers.ProviderTypeAks {
+	} else if node.Provider != providermodels.ProviderTypeAks {
 		workerName = machineNameSplit[len(clusterNameSplit)]
 	} else {
 		workerName = machineNameSplit[1]

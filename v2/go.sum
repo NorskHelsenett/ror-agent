@@ -1,5 +1,5 @@
-github.com/NorskHelsenett/ror v1.3.0-rc1 h1:x1kn0DfB8gGWjmwam2A4zf91FffAEMoJtH4EQjKR36w=
-github.com/NorskHelsenett/ror v1.3.0-rc1/go.mod h1:EofYmCYKX23KMHH8+Y3ukOF1+LC1pvbCTOkcWv7BQhA=
+github.com/NorskHelsenett/ror v1.4.0-rc1 h1:co4T0t+lGjgKPrlD6/QUUmMc6nqc9Aar0o7ntoCLEGg=
+github.com/NorskHelsenett/ror v1.4.0-rc1/go.mod h1:EofYmCYKX23KMHH8+Y3ukOF1+LC1pvbCTOkcWv7BQhA=
 github.com/NorskHelsenett/ror-agent v1.0.21 h1:0gFR+dANXFrj0e/SnL6Y7Y60x/MEXbC9xnAY8t1Cov4=
 github.com/NorskHelsenett/ror-agent v1.0.21/go.mod h1:Y+ZjoTMFhaG9rh412bAZ+/dDaKOw7n/z//7HpVoWAXI=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=

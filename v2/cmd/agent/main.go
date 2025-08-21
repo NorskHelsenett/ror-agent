@@ -54,6 +54,8 @@ func main() {
 		rlog.Fatal("could not get RorClientInterface", err)
 	}
 
+	kubernetesclients := clients.MustInitializeKubernetesClient()
+
 	resourceCache, err := resourcecache.NewResourceCache(resourcecache.ResourceCacheConfig{WorkQueueInterval: 10, RorClient: rorClientInterface})
 
 	if err != nil {
@@ -68,13 +70,13 @@ func main() {
 
 	rlog.Info("Starting dynamic client handler")
 	dynamicclienthandler := dynamicclienthandler.NewDynamicClientHandler(resourceCache)
-	err = dynamicclient.Start(rorClientInterface.GetKubernetesClientSet(), dynamicclienthandler, stop, sigs)
+	err = dynamicclient.Start(kubernetesclients, dynamicclienthandler, stop, sigs)
 	if err != nil {
 		rlog.Fatal("could not start dynamic client", err)
 	}
 
 	rlog.Info("Starting schedulers")
-	scheduler.SetUpScheduler(rorClientInterface)
+	scheduler.SetUpScheduler(rorClientInterface, kubernetesclients)
 
 	<-stop
 	rlog.Info("Shutting down...")

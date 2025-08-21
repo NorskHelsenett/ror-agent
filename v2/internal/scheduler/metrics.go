@@ -6,19 +6,19 @@ import (
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
-	"github.com/NorskHelsenett/ror/pkg/helpers/rorclientconfig"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
+	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
 	apimachinery "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func MetricsReporting(rorClientInterface rorclientconfig.RorClientInterface) error {
+func MetricsReporting(rorClientInterface rorclient.RorClientInterface, kubernetesClientset *kubernetesclient.K8sClientsets) error {
 	var metricsReport apicontracts.MetricsReport
 
-	metricsReportNodes, err := CreateNodeMetricsList(rorClientInterface.GetKubernetesClientSet())
+	metricsReportNodes, err := CreateNodeMetricsList(kubernetesClientset)
 	if err != nil {
 		rlog.Error("error converting podmetrics", err)
 		return err
@@ -30,7 +30,7 @@ func MetricsReporting(rorClientInterface rorclientconfig.RorClientInterface) err
 	}
 	metricsReport.Nodes = metricsReportNodes
 
-	return rorClientInterface.GetRorClient().Metrics().PostReport(context.TODO(), metricsReport)
+	return rorClientInterface.Metrics().PostReport(context.TODO(), metricsReport)
 
 }
 

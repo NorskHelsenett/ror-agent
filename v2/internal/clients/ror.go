@@ -16,7 +16,6 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport/httpclient"
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
-	"github.com/NorskHelsenett/ror/pkg/helpers/rorclientconfig"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
@@ -30,7 +29,6 @@ const ERR_SECRET_NOT_FOUND = "___secret_not_found___"
 type RorAgentClientInterface struct {
 	rorAPIClient *rorclient.RorClient
 	k8sClientSet *kubernetesclient.K8sClientsets
-	ownerRef     rorresourceowner.RorResourceOwnerReference
 	config       ClientConfig
 }
 
@@ -43,7 +41,7 @@ type ClientConfig struct {
 	rorVersion   rorversion.RorVersion
 }
 
-func NewRorClientInterface() (rorclientconfig.RorClientInterface, error) {
+func NewRorClientInterface() (rorclient.RorClientInterface, error) {
 	var err error
 
 	// Create a pointer to the struct
@@ -82,12 +80,12 @@ func NewRorClientInterface() (rorclientconfig.RorClientInterface, error) {
 	}
 
 	rlog.Info("connected to ror-api", rlog.String("version", ver), rlog.String("clusterid", selfdata.ClusterId))
-	rorClient.SetOwnerref(rorresourceowner.RorResourceOwnerReference{
+	rorClient.rorAPIClient.SetOwnerref(rorresourceowner.RorResourceOwnerReference{
 		Scope:   aclmodels.Acl2ScopeCluster,
 		Subject: aclmodels.Acl2Subject(selfdata.ClusterId),
 	})
 
-	return rorClient, nil
+	return rorClient.rorAPIClient, nil
 }
 
 func (r *RorAgentClientInterface) getClientConfig() {
@@ -168,22 +166,6 @@ func (r *RorAgentClientInterface) kubernetesCreateApiKeySecret(apiKey string) er
 	r.config.apiKey = apiKey
 	return nil
 
-}
-
-func (r *RorAgentClientInterface) GetRorClient() rorclient.RorClientInterface {
-	return r.rorAPIClient
-}
-
-func (r *RorAgentClientInterface) GetKubernetesClientSet() *kubernetesclient.K8sClientsets {
-	return r.k8sClientSet
-}
-
-func (r *RorAgentClientInterface) GetOwnerref() rorresourceowner.RorResourceOwnerReference {
-	return r.ownerRef
-}
-
-func (r *RorAgentClientInterface) SetOwnerref(ownerref rorresourceowner.RorResourceOwnerReference) {
-	r.ownerRef = ownerref
 }
 
 // kubernetesAuth sets the api key from the secret defined in the config value apiKeySecret

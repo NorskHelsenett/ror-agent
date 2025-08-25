@@ -72,12 +72,6 @@ func (h *handler) SendResource(action rortypes.ResourceAction, input map[string]
 	if needUpdate {
 
 		h.resourceCache.AddResource(rorres)
-		// if err != nil {
-		// 	rlog.Error("error sending resource update to ror, added to retryQeue", err)
-		// 	ResourceCache.WorkQeueue.Add(rorres)
-		// 	return
-		// }
-
 	}
 
 }

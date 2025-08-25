@@ -47,12 +47,6 @@ jobs:
           mkdir -p dist/isbuilt
           CGO_ENABLED=0 go build -o dist/${{ env.APP }} -ldflags "-w -extldflags '-static' -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Version=${{ needs.setenv.outputs.rorversion}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Commit=${{ needs.setenv.outputs.shortsha}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.LibVer=${{ needs.setenv.outputs.libver}}" ${{ env.APP_PATH }}/main.go
           touch dist/isbuilt/${{ env.APP }}
-    - name: Generate SBOM for binary
-      uses: anchore/sbom-action@v0.15.10
-      with:
-        path: v2
-        format: spdx-json
-        output-file: v2/dist/${{ env.APP }}.spdx.json
     - name: Archive binary and SBOM
       uses: actions/upload-artifact@v4
       with:
@@ -60,7 +54,6 @@ jobs:
         path: |
           v2/dist/${{ env.APP }}
           v2/dist/isbuilt/${{ env.APP }}
-          v2/dist/${{ env.APP }}.spdx.json
         retention-days: 1
   build-container-image:
     runs-on: ubuntu-latest
@@ -127,7 +120,7 @@ jobs:
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setenv.outputs.rorversion }}
           format: spdx-json
-          output-file: container-sbom.spdx.json
+          output-file: container_sbom.json
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}
         env:
@@ -137,22 +130,22 @@ jobs:
       - name: Sign SBOM
         if: github.event_name != 'pull_request'
         run: |
-          cosign sign-blob --yes container-sbom.spdx.json --output-signature container-sbom.spdx.json.sig
+          cosign sign-blob --yes container_sbom.json --output-signature container_sbom.json.sig
       - name: Attest SBOM to image
         if: github.event_name != 'pull_request'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
-          echo "${TAGS}" | head -1 | xargs -I {} cosign attest --yes --predicate container-sbom.spdx.json --type spdxjson {}@${DIGEST}
+          echo "${TAGS}" | head -1 | xargs -I {} cosign attest --yes --predicate container_sbom.json --type spdxjson {}@${DIGEST}
       - name: Upload SBOM artifacts
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: container-sbom
           path: |
-            container-sbom.spdx.json
-            container-sbom.spdx.json.sig
+            container_sbom.json
+            container_sbom.json.sig
           retention-days: 30
   publish-helm:
     permissions:

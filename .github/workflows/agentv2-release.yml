@@ -120,13 +120,6 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
-      - name: Attest SBOM to image
-        if: github.event_name != 'pull_request'
-        env:
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: |
-          echo "${TAGS}" | head -1 | xargs -I {} cosign attest --yes --predicate sbom.spdx.json --type spdxjson {}@${DIGEST}
   publish-helm:
     permissions:
       contents: read

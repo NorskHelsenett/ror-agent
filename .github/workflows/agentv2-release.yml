@@ -157,11 +157,12 @@ jobs:
           ./yq e -i '.image.tag = strenv(ROR_VERSION),.image.repository = "ghcr.io/norskhelsenett/${{ env.APP }}"' charts/ror-cluster-agent-v2/values.yaml
           helm package charts/ror-cluster-agent-v2
           echo  ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ${{ env.REGISTRY }} --password-stdin
-          HELM_PUSH_OUTPUT=$(helm push ${{ env.APP }}-${HELM_VERSION}.tgz oci://${{ env.REGISTRY }}/norskhelsenett/helm/)
+          HELM_PUSH_OUTPUT=$(helm push ${{ env.APP }}-${HELM_VERSION}.tgz oci://${{ env.REGISTRY }}/norskhelsenett/helm/ 2>&1)
           echo "$HELM_PUSH_OUTPUT"
-          HELM_DIGEST=$(echo "$HELM_PUSH_OUTPUT" | grep -o 'sha256:[a-f0-9]\{64\}')
+          HELM_DIGEST=$(echo "$HELM_PUSH_OUTPUT" | grep "^Digest:" | cut -d' ' -f2)
           echo "digest=${HELM_DIGEST}" >> "$GITHUB_OUTPUT"
           echo "repository=${{ env.REGISTRY }}/norskhelsenett/helm/${{ env.APP }}" >> "$GITHUB_OUTPUT"
+          echo "Captured digest: ${HELM_DIGEST}"
         env:
           ROR_VERSION: ${{ needs.setenv.outputs.rorversion }}
       - name: Log into registry ${{ env.REGISTRY }}

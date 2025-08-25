@@ -47,13 +47,20 @@ jobs:
           mkdir -p dist/isbuilt
           CGO_ENABLED=0 go build -o dist/${{ env.APP }} -ldflags "-w -extldflags '-static' -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Version=${{ needs.setenv.outputs.rorversion}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Commit=${{ needs.setenv.outputs.shortsha}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.LibVer=${{ needs.setenv.outputs.libver}}" ${{ env.APP_PATH }}/main.go
           touch dist/isbuilt/${{ env.APP }}
-    - name: Archive binary
+    - name: Generate SBOM for binary
+      uses: anchore/sbom-action@v0.15.10
+      with:
+        path: v2
+        format: spdx-json
+        output-file: v2/dist/${{ env.APP }}.spdx.json
+    - name: Archive binary and SBOM
       uses: actions/upload-artifact@v4
       with:
         name: binary-build
         path: |
           v2/dist/${{ env.APP }}
           v2/dist/isbuilt/${{ env.APP }}
+          v2/dist/${{ env.APP }}.spdx.json
         retention-days: 1
   build-container-image:
     runs-on: ubuntu-latest
@@ -65,6 +72,9 @@ jobs:
       contents: read
       packages: write
       id-token: write
+    outputs:
+      image-digest: ${{ steps.build-and-push.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -109,12 +119,41 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          sbom: true
+          provenance: true
+      - name: Generate SBOM for container image
+        if: github.event_name != 'pull_request'
+        uses: anchore/sbom-action@v0.15.10
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setenv.outputs.rorversion }}
+          format: spdx-json
+          output-file: container-sbom.spdx.json
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+      - name: Sign SBOM
+        if: github.event_name != 'pull_request'
+        run: |
+          cosign sign-blob --yes container-sbom.spdx.json --output-signature container-sbom.spdx.json.sig
+      - name: Attest SBOM to image
+        if: github.event_name != 'pull_request'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        run: |
+          echo "${TAGS}" | head -1 | xargs -I {} cosign attest --yes --predicate container-sbom.spdx.json --type spdxjson {}@${DIGEST}
+      - name: Upload SBOM artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-sbom
+          path: |
+            container-sbom.spdx.json
+            container-sbom.spdx.json.sig
+          retention-days: 30
   publish-helm:
     permissions:
       contents: read
@@ -140,6 +179,10 @@ jobs:
         env:
           VERSION: v4.44.5
           BINARY: yq_linux_amd64
+      - name: Install cosign
+        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
       - name: Build helm chart
         run: |
           export HELM_VERSION=${ROR_VERSION#v*}
@@ -148,5 +191,11 @@ jobs:
           helm package charts/ror-cluster-agent-v2
           echo  ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ${{ env.REGISTRY }} --password-stdin
           helm push ${{ env.APP }}-${HELM_VERSION}.tgz oci://${{ env.REGISTRY }}/norskhelsenett/helm/
+        env:
+          ROR_VERSION: ${{ needs.setenv.outputs.rorversion }}
+      - name: Sign Helm chart
+        run: |
+          export HELM_VERSION=${ROR_VERSION#v*}
+          cosign sign --yes ${{ env.REGISTRY }}/norskhelsenett/helm/${{ env.APP }}:${HELM_VERSION}
         env:
           ROR_VERSION: ${{ needs.setenv.outputs.rorversion }}

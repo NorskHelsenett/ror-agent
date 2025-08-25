@@ -69,7 +69,7 @@ func (h *handler) SendResource(action rortypes.ResourceAction, input map[string]
 	}
 
 	needUpdate := h.resourceCache.CheckUpdateNeeded(rorres.GetUID(), rorres.GetRorHash())
-	if needUpdate {
+	if needUpdate || action == rortypes.K8sActionDelete {
 
 		h.resourceCache.AddResource(rorres)
 	}

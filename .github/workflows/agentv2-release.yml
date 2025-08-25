@@ -62,7 +62,7 @@ jobs:
       - build-app
       - setenv
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
     outputs:
@@ -138,15 +138,6 @@ jobs:
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "${TAGS}" | head -1 | xargs -I {} cosign attest --yes --predicate container_sbom.json --type spdxjson {}@${DIGEST}
-      - name: Upload SBOM artifacts
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: container-sbom
-          path: |
-            container_sbom.json
-            container_sbom.json.sig
-          retention-days: 30
   publish-helm:
     permissions:
       contents: read

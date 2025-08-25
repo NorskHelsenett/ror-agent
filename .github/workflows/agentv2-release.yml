@@ -114,40 +114,19 @@ jobs:
           cache-to: type=gha,mode=max
           sbom: true
           provenance: true
-      - name: Generate SBOM for container image
-        if: github.event_name != 'pull_request'
-        uses: anchore/sbom-action@v0.15.10
-        with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setenv.outputs.rorversion }}
-          format: spdx-json
-          upload-artifact: false
-          output-file: container_sbom.json
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
-      - name: Sign SBOM
-        if: github.event_name != 'pull_request'
-        run: |
-          cosign sign-blob --yes container_sbom.json --output-signature container_sbom.json.sig
       - name: Attest SBOM to image
         if: github.event_name != 'pull_request'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
-          echo "${TAGS}" | head -1 | xargs -I {} cosign attest --yes --predicate container_sbom.json --type spdxjson {}@${DIGEST}
-      - name: Upload SBOM artifacts
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: container-sbom
-          path: |
-            container_sbom.json
-            container_sbom.json.sig
-          retention-days: 30
+          echo "${TAGS}" | head -1 | xargs -I {} cosign attest --yes --predicate sbom.spdx.json --type spdxjson {}@${DIGEST}
   publish-helm:
     permissions:
       contents: read

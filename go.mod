@@ -3,13 +3,13 @@ module github.com/NorskHelsenett/ror-agent
 go 1.24.4
 
 require (
-	github.com/NorskHelsenett/ror v1.4.1
+	github.com/NorskHelsenett/ror v1.4.2
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/google/go-cmp v0.7.0
 	github.com/spf13/viper v1.20.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	go.uber.org/automaxprocs v1.6.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.4

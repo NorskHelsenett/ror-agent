@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -27,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 var MissingConst = "Missing ..."
@@ -165,6 +168,35 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 		}
 	}
 
+	var k8sCaCertificate string
+
+	// Get the cluster CA certificate from the service account's ca.crt file
+	// This is the standard way to get the CA certificate when running inside a pod
+	caCertPath := "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	if caCertData, err := os.ReadFile(caCertPath); err == nil {
+		k8sCaCertificate = base64.StdEncoding.EncodeToString(caCertData)
+		rlog.Debug("Successfully read cluster CA certificate from service account")
+	} else {
+		rlog.Warn("Could not read CA certificate from service account", rlog.String("path", caCertPath), rlog.Any("error", err))
+
+		// Fallback: try to get it from REST config using the config package
+		if restConfig, err := rest.InClusterConfig(); err == nil {
+			if len(restConfig.CAData) > 0 {
+				k8sCaCertificate = base64.StdEncoding.EncodeToString(restConfig.CAData)
+				rlog.Debug("Successfully read cluster CA certificate from REST config CAData")
+			} else if restConfig.CAFile != "" {
+				if caCertData, err := os.ReadFile(restConfig.CAFile); err == nil {
+					k8sCaCertificate = base64.StdEncoding.EncodeToString(caCertData)
+					rlog.Debug("Successfully read cluster CA certificate from REST config CAFile")
+				} else {
+					rlog.Error("Could not read CA certificate file", err, rlog.String("caFile", restConfig.CAFile))
+				}
+			}
+		} else {
+			rlog.Error("Could not get in-cluster config for CA certificate extraction", err)
+		}
+	}
+
 	if len(nodes) > 0 {
 		firstNode := nodes[0]
 		clusterName = firstNode.ClusterName
@@ -246,6 +278,10 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 				Name:     datacenterName,
 				Provider: provider,
 			},
+		},
+		KubeApi: apicontracts.ClusterKubeApi{
+			EndpointAddress: k8sControlPlaneEndpoint,
+			Certificate:     k8sCaCertificate,
 		},
 	}
 	return report, nil

@@ -49,7 +49,7 @@ func GetNodes(k8sClient *kubernetes.Clientset, metricsClient *metrics.Clientset)
 		n.Name = node.Name
 		n.Labels = node.Labels
 
-		switch report.report.Interregator {
+		switch report.Interregator {
 		case providermodels.ProviderTypeTanzu:
 			fillNodeTanzu(&n)
 		case providermodels.ProviderTypeAks:

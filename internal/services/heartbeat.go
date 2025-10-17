@@ -523,6 +523,9 @@ func getControlPlaneEndpoint(clientset *kubernetes.Clientset) (string, error) {
 		if endpoint, ok := node.Annotations["ror.io/api-endpoint-addr"]; ok {
 			return endpoint, nil
 		}
+		if endpoint, ok := node.Annotations["vitistack.io/kubernetes-endpoint-addr"]; ok {
+			return endpoint, nil
+		}
 	}
 
 	kubeadmConfigMap, err := clientset.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "kubeadm-config", v1.GetOptions{})

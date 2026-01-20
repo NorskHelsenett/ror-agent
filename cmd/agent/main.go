@@ -4,16 +4,15 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror-agent/internal/controllers"
-	"github.com/NorskHelsenett/ror-agent/internal/httpserver"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragent"
+
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
@@ -34,46 +33,32 @@ func main() {
 
 	go func() {
 		services.GetEgressIp()
-		sig := <-sigs
-		_, _ = fmt.Println()
-		_, _ = fmt.Print(sig)
-		stop <- struct{}{}
 	}()
 
-	clients.Initialize()
+	rorClientInterface, err := clusteragentclient.NewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
+	if err != nil {
+		rlog.Fatal("could not get RorClientInterface", err)
+	}
 
-	discoveryClient, err := clients.Kubernetes.GetDiscoveryClient()
+	discoveryClient, err := rorClientInterface.GetKubernetesClientset().GetDiscoveryClient()
 	if err != nil {
 		rlog.Error("failed to get discovery client", err)
 	}
 
-	dynamicClient, err := clients.Kubernetes.GetDynamicClient()
+	dynamicClient, err := rorClientInterface.GetKubernetesClientset().GetDynamicClient()
 	if err != nil {
 		rlog.Error("failed to get dynamic client", err)
 	}
-
-	// start of refactoring initialize apikey
-	// k8sclient, viper
-
-	err = clusteragent.InitializeClusterAgent(clients.Kubernetes)
-	if err != nil {
-		rlog.Fatal("could not initialize cluster agent", err)
-	}
-
-	// end
 
 	err = resourceupdate.ResourceCache.Init()
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 
-	err = scheduler.HeartbeatReporting()
+	err = scheduler.HeartbeatReporting(rorClientInterface)
 	if err != nil {
 		rlog.Fatal("could not send heartbeat to api", err)
 	}
-
-	// waiting for ip check to finish :)
-	time.Sleep(time.Second * 1)
 
 	schemas := clients.InitSchema()
 
@@ -98,15 +83,7 @@ func main() {
 		}
 	}
 
-	go func() {
-		httpserver.InitHttpServer()
-		sig := <-sigs
-		_, _ = fmt.Println()
-		_, _ = fmt.Println(sig)
-		stop <- struct{}{}
-	}()
-
-	scheduler.SetUpScheduler()
+	scheduler.SetUpScheduler(rorClientInterface)
 
 	<-stop
 	rlog.Info("Shutting down...")

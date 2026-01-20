@@ -159,6 +159,12 @@ func (r *rorAgentClient) initKubernetesClusterSetup() error {
 	if r.config.apiEndpoint == "" {
 		return fmt.Errorf("failed to get api endpoint")
 	}
+
+	//Check if we know the cluster id
+	if r.config.interregator.GetClusterId() != providermodels.UNKNOWN_CLUSTER_ID {
+		rlog.Info("cluster id found from interregator", rlog.String("cluster id", r.config.interregator.GetClusterId()))
+	}
+
 	if r.config.apiKey == ERR_SECRET_NOT_FOUND {
 		rlog.Info("api key secret not found, interregating cluster and registering new key")
 

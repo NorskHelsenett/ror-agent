@@ -4,21 +4,22 @@ import (
 	"context"
 	"time"
 
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
-	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
 	apimachinery "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func MetricsReporting(rorClientInterface rorclient.RorClientInterface, kubernetesClientset *kubernetesclient.K8sClientsets) error {
+func MetricsReporting(rorAgentClientInterface clusteragentclient.RorAgentClientInterface) error {
 	var metricsReport apicontracts.MetricsReport
+	rorClientInterface := rorAgentClientInterface.GetRorClient()
 
-	metricsReportNodes, err := CreateNodeMetricsList(kubernetesClientset)
+	metricsReportNodes, err := CreateNodeMetricsList(rorAgentClientInterface.GetKubernetesClientset())
 	if err != nil {
 		rlog.Error("error converting podmetrics", err)
 		return err

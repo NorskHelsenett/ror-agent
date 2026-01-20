@@ -9,16 +9,15 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/config"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/helpers/otel/httpserver"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
-
-	"github.com/spf13/viper"
 )
 
 var healthStatus HealthStatus
 
 func InitHttpServer() {
-	serveAddress := viper.GetString(configconsts.HEALTH_ENDPOINT)
+	serveAddress := rorconfig.GetString(configconsts.HEALTH_ENDPOINT)
 
 	healthStatus = getHealthReportOrDie()
 
@@ -37,7 +36,7 @@ func health(w http.ResponseWriter, req *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if strings.Contains(healthStatus.Status, "Crap") || strings.Contains(healthStatus.Status, "UnHealthy") || healthStatus.Report.ErrorCount > 0 || len(viper.GetString(configconsts.API_KEY)) == 0 {
+	if strings.Contains(healthStatus.Status, "Crap") || strings.Contains(healthStatus.Status, "UnHealthy") || healthStatus.Report.ErrorCount > 0 || len(rorconfig.GetString(configconsts.API_KEY)) == 0 {
 		w.WriteHeader(500)
 	}
 
@@ -46,7 +45,7 @@ func health(w http.ResponseWriter, req *http.Request) {
 
 func getHealthReportOrDie() (result HealthStatus) {
 	gotAuthSetting := false
-	if len(viper.GetString(configconsts.API_KEY)) != 0 {
+	if len(rorconfig.GetString(configconsts.API_KEY)) != 0 {
 		gotAuthSetting = true
 	}
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,34 +13,21 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragent"
 
-	"github.com/NorskHelsenett/ror-agent/internal/checks/initialchecks"
-	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/operator/initialize"
-
-	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	"syscall"
 
-	"github.com/spf13/viper"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
-
-	// https://blog.devgenius.io/know-gomaxprocs-before-deploying-your-go-app-to-kubernetes-7a458fb63af1
-
-	"go.uber.org/automaxprocs/maxprocs"
 )
 
-// init
-func init() {
-	_, _ = maxprocs.Set(maxprocs.Logger(rlog.Infof))
-	config.Init()
-}
-
 func main() {
+	config.Init()
 	_ = "rebuild 6"
-	rlog.Info("Agent is starting", rlog.String("version", viper.GetString(configconsts.VERSION)))
+	rlog.Info("Agent is starting", rlog.String("version", rorversion.GetRorVersion().GetVersion()))
 	sigs := make(chan os.Signal, 1)                                    // Create channel to receive os signals
 	stop := make(chan struct{})                                        // Create channel to receive stop signal
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT) // Register the sigs channel to receieve SIGTERM
@@ -56,11 +42,6 @@ func main() {
 
 	clients.Initialize()
 
-	k8sClient, err := clients.Kubernetes.GetKubernetesClientset()
-	if err != nil {
-		panic(err.Error())
-	}
-
 	discoveryClient, err := clients.Kubernetes.GetDiscoveryClient()
 	if err != nil {
 		rlog.Error("failed to get discovery client", err)
@@ -71,31 +52,15 @@ func main() {
 		rlog.Error("failed to get dynamic client", err)
 	}
 
-	ns := viper.GetString(configconsts.POD_NAMESPACE)
-	if ns == "" {
-		rlog.Fatal("POD_NAMESPACE is not set", nil)
+	// start of refactoring initialize apikey
+	// k8sclient, viper
+
+	err = clusteragent.InitializeClusterAgent(clients.Kubernetes)
+	if err != nil {
+		rlog.Fatal("could not initialize cluster agent", err)
 	}
 
-	_, err = k8sClient.CoreV1().Namespaces().Get(context.Background(), ns, metav1.GetOptions{})
-	if err != nil {
-		rlog.Fatal("could not get namespace", err)
-	}
-
-	err = initialchecks.HasSuccessfullRorApiConnection()
-	if err != nil {
-		rlog.Fatal("could not connect to ror-api", err)
-	}
-
-	err = services.ExtractApikeyOrDie()
-	if err != nil {
-		rlog.Fatal("could not get or create secret", err)
-	}
-
-	clusterId, err := initialize.GetOwnClusterId()
-	if err != nil {
-		rlog.Fatal("could not fetch clusterid from ror-api", err)
-	}
-	viper.Set(configconsts.CLUSTER_ID, clusterId)
+	// end
 
 	err = resourceupdate.ResourceCache.Init()
 	if err != nil {

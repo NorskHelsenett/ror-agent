@@ -13,10 +13,11 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/operator/initialize"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v2"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
-	"github.com/spf13/viper"
 	coreV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -26,23 +27,25 @@ import (
 
 var EgressIp string
 
-func FetchApikey(k8sClient *kubernetes.Clientset, metricsClient *metrics.Clientset) (string, error) {
-	clusterInfo, err := initialize.GetClusterInfoFromNode(k8sClient, metricsClient)
-	if err != nil {
-		rlog.Error("could not get identifier", err)
-		return "", errors.New("could not get identifier")
+func CreateApikey(k8sClient *kubernetes.Clientset, metricsClient *metrics.Clientset) (string, error) {
+	//clusterInfo, err := initialize.GetClusterInfoFromNode(k8sClient, metricsClient)
+	interregator := clusterinterregator.NewClusterInterregatorFromKubernetesClient(k8sClient)
+
+	if interregator == nil {
+		err := errors.New("failed to get apikey, could not create cluster interregator")
+		return "", err
 	}
 
-	rorUrl := viper.GetString(configconsts.API_ENDPOINT)
-	apikey, err := initialize.GetApikey(clusterInfo, rorUrl)
+	rorUrl := rorconfig.GetString(configconsts.API_ENDPOINT)
+	apikey, err := initialize.GetApikey(interregator, rorUrl)
 	if err != nil {
 		rlog.Error("not able to get api key", err,
-			rlog.String("clusterName", clusterInfo.ClusterName),
+			rlog.String("clusterName", interregator.GetClusterName()),
 			rlog.String("ror url", rorUrl))
 
-		return "", fmt.Errorf("could not fetch api key from API (url: %s)", rorUrl)
+		return "", fmt.Errorf("could not get api key from API (url: %s)", rorUrl)
 	}
-	viper.Set(configconsts.API_KEY, apikey)
+	rorconfig.Set(configconsts.API_KEY, apikey)
 	return apikey, nil
 }
 
@@ -57,15 +60,15 @@ func ExtractApikeyOrDie() error {
 		return err
 	}
 
-	secretName := viper.GetString(configconsts.API_KEY_SECRET)
-	namespace := viper.GetString(configconsts.POD_NAMESPACE)
+	secretName := rorconfig.GetString(configconsts.API_KEY_SECRET)
+	namespace := rorconfig.GetString(configconsts.POD_NAMESPACE)
 	secretApiKey := "APIKEY"
 	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metaV1.GetOptions{})
 	if err != nil {
-		apikey, err := FetchApikey(k8sClient, metricsClient)
+		apikey, err := CreateApikey(k8sClient, metricsClient)
 		if err != nil {
-			rlog.Error("could not fetch api key: ", err)
-			return errors.New("could not fetch api key")
+			rlog.Error("could not create api key: ", err)
+			return errors.New("could not create api key")
 		}
 		secret, err = k8sClient.CoreV1().Secrets(namespace).Create(context.TODO(),
 			&coreV1.Secret{
@@ -86,7 +89,7 @@ func ExtractApikeyOrDie() error {
 	}
 
 	apikey := string(secret.Data[secretApiKey])
-	viper.Set(configconsts.API_KEY, apikey)
+	rorconfig.Set(configconsts.API_KEY, apikey)
 
 	return nil
 }

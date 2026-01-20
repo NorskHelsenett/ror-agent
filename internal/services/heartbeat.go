@@ -17,13 +17,14 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/utils"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
+	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -224,8 +225,8 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 		memoryConsumedSum = memoryConsumedSum + nodepool.Metrics.MemoryConsumed
 	}
 
-	agentVersion := viper.GetString(configconsts.VERSION)
-	agentSha := viper.GetString(configconsts.COMMIT)
+	agentVersion := rorversion.GetRorVersion().GetVersion()
+	agentSha := rorversion.GetRorVersion().GetCommit()
 
 	var created time.Time
 	kubeSystem := "kube-system"
@@ -241,7 +242,7 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 			AccessGroups: nhnToolingMetadata.AccessGroups,
 		},
 		Environment: nhnToolingMetadata.Environment,
-		ClusterId:   viper.GetString(configconsts.CLUSTER_ID),
+		ClusterId:   rorconfig.GetString(configconsts.CLUSTER_ID),
 		ClusterName: clusterName,
 		Ingresses:   ingresses,
 		Created:     created,
@@ -326,7 +327,7 @@ func getNhnToolingMetadata(k8sClient *kubernetes.Clientset, dynamicClient dynami
 		Environment:  "dev",
 	}
 
-	namespace := viper.GetString(configconsts.POD_NAMESPACE)
+	namespace := rorconfig.GetString(configconsts.POD_NAMESPACE)
 	nhnToolingConfigMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), "nhn-tooling", v1.GetOptions{
 		TypeMeta:        v1.TypeMeta{},
 		ResourceVersion: "",

@@ -1,66 +1,103 @@
 // The package implements clients for the ror-agent
-package clients
+package clusteragentclient
 
 import (
+	"context"
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
-	"github.com/NorskHelsenett/ror/pkg/clients/kubernetes/clusterinterregator"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport/httpauthprovider"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport/httpclient"
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v2"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v2"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
-	"github.com/spf13/viper"
-	v1 "k8s.io/api/core/v1"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 const ERR_SECRET_NOT_FOUND = "___secret_not_found___"
 
-type RorAgentClientInterface struct {
-	rorAPIClient *rorclient.RorClient
-	k8sClientSet *kubernetesclient.K8sClientsets
-	config       ClientConfig
+type RorAgentClientInterface interface {
+	GetRorClient() rorclient.RorClientInterface
+	GetKubernetesClientset() *kubernetesclient.K8sClientsets
+
+	PingRorAPI() error
 }
 
-type ClientConfig struct {
+type RorAgentClientConfig struct {
 	role         string
 	namespace    string
 	apiEndpoint  string
 	apiKey       string
 	apiKeySecret string
-	rorVersion   rorversion.RorVersion
+	interregator interregatortypes.ClusterInterregator
 }
 
-func NewRorClientInterface() (rorclient.RorClientInterface, error) {
+type rorAgentClient struct {
+	rorAPIClient *rorclient.RorClient
+	k8sClientSet *kubernetesclient.K8sClientsets
+	config       RorAgentClientConfig
+}
+
+func GetDefaultRorAgentClientConfig() *RorAgentClientConfig {
+	rorconfig.SetDefault(configconsts.API_KEY, ERR_SECRET_NOT_FOUND)
+	return &RorAgentClientConfig{
+		role:         rorconfig.GetString(configconsts.ROLE),
+		namespace:    rorconfig.GetString(configconsts.POD_NAMESPACE),
+		apiKeySecret: rorconfig.GetString(configconsts.API_KEY_SECRET),
+		apiKey:       rorconfig.GetString(configconsts.API_KEY),
+		apiEndpoint:  rorconfig.GetString(configconsts.API_ENDPOINT),
+	}
+}
+
+func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, error) {
 	var err error
 
 	// Create a pointer to the struct
-	rorClient := &RorAgentClientInterface{}
+	rorClient := &rorAgentClient{}
 
-	rorClient.getClientConfig()
-
-	rorClient.k8sClientSet = MustInitializeKubernetesClient()
-
-	// check if kubernetes client is initialized
-	if rorClient.k8sClientSet != nil {
-		rlog.Debug("Using kubernetes secret to get api-key")
-		rorClient.kubernetesAuth()
+	if config != nil {
+		rorClient.config = *config
+	} else {
+		rorClient.config = *GetDefaultRorAgentClientConfig()
 	}
 
-	err = rorClient.initKubernetesClusterSetup()
-	if err != nil {
-		rlog.Error("failed to initialize kubernetes cluster setup", err)
-		return nil, err
+	rorClient.k8sClientSet = kubernetesclient.MustInitializeKubernetesClient()
+
+	if rorClient.k8sClientSet != nil {
+		k8sclientset, err := rorClient.k8sClientSet.GetKubernetesClientset()
+		if err != nil {
+			rlog.Error("failed to get kubernetes clientset", err)
+			return nil, err
+		}
+
+		rorClient.config.interregator = clusterinterregator.NewClusterInterregatorFromKubernetesClient(k8sclientset)
+
+		if rorClient.config.interregator.GetProvider() == providermodels.ProviderTypeUnknown {
+			rlog.Error("could not determine provider type", fmt.Errorf("unknown provider"))
+			return nil, fmt.Errorf("could not determine provider type")
+		}
+
+		rlog.Debug("Using kubernetes secret to get api-key")
+		rorClient.kubernetesAuth()
+
+		err = rorClient.initKubernetesClusterSetup()
+		if err != nil {
+			rlog.Error("failed to initialize kubernetes cluster setup", err)
+			return nil, err
+		}
 	}
 
 	err = rorClient.initAuthorizedRorClient()
@@ -69,7 +106,7 @@ func NewRorClientInterface() (rorclient.RorClientInterface, error) {
 		return nil, err
 	}
 
-	ver, err := rorClient.rorAPIClient.Info().GetVersion()
+	ver, err := rorClient.rorAPIClient.Info().GetVersion(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -84,25 +121,30 @@ func NewRorClientInterface() (rorclient.RorClientInterface, error) {
 		Scope:   aclmodels.Acl2ScopeCluster,
 		Subject: aclmodels.Acl2Subject(selfdata.ClusterId),
 	})
+	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.ClusterId)
 
-	return rorClient.rorAPIClient, nil
+	return rorClient, nil
 }
 
-func (r *RorAgentClientInterface) getClientConfig() {
-	viper.SetDefault(configconsts.API_KEY, ERR_SECRET_NOT_FOUND)
+func (r *rorAgentClient) GetRorClient() rorclient.RorClientInterface {
+	return r.rorAPIClient
+}
 
-	r.config = ClientConfig{
-		role:         viper.GetString(configconsts.ROLE),
-		namespace:    viper.GetString(configconsts.POD_NAMESPACE),
-		apiKeySecret: viper.GetString(configconsts.API_KEY_SECRET),
-		apiKey:       viper.GetString(configconsts.API_KEY),
-		apiEndpoint:  viper.GetString(configconsts.API_ENDPOINT),
-		rorVersion:   config.GetRorVersion(),
+func (r *rorAgentClient) GetKubernetesClientset() *kubernetesclient.K8sClientsets {
+	return r.k8sClientSet
+}
+
+func (r *rorAgentClient) PingRorAPI() error {
+	if r.rorAPIClient == nil {
+		r.initUnathorizedRorClient()
 	}
-
+	if r.rorAPIClient.Ping() {
+		return nil
+	}
+	return fmt.Errorf("could not ping ror-api")
 }
 
-func (r *RorAgentClientInterface) initKubernetesClusterSetup() error {
+func (r *rorAgentClient) initKubernetesClusterSetup() error {
 
 	// check if namespace is set and accessible
 	if r.config.namespace == "" {
@@ -117,22 +159,22 @@ func (r *RorAgentClientInterface) initKubernetesClusterSetup() error {
 	if r.config.apiEndpoint == "" {
 		return fmt.Errorf("failed to get api endpoint")
 	}
+
+	//Check if we know the cluster id
+	if r.config.interregator.GetClusterId() != providermodels.UNKNOWN_CLUSTER_ID {
+		rlog.Info("cluster id found from interregator", rlog.String("cluster id", r.config.interregator.GetClusterId()))
+	}
+
 	if r.config.apiKey == ERR_SECRET_NOT_FOUND {
 		rlog.Info("api key secret not found, interregating cluster and registering new key")
 
-		interregationreport, err := clusterinterregator.InterregateCluster(r.k8sClientSet)
-
-		if err != nil {
-			return fmt.Errorf("failed to interregate cluster %s", err)
-		}
-
 		r.initUnathorizedRorClient()
 		key, err := r.rorAPIClient.Clusters().Register(apicontracts.AgentApiKeyModel{
-			Identifier:     interregationreport.ClusterName,
-			DatacenterName: interregationreport.Datacenter,
-			WorkspaceName:  interregationreport.Workspace,
-			Provider:       interregationreport.Provider,
-			Type:           "Cluster",
+			Identifier:     r.config.interregator.GetClusterName(),
+			DatacenterName: r.config.interregator.GetDatacenter(),
+			WorkspaceName:  r.config.interregator.GetClusterWorkspace(),
+			Provider:       r.config.interregator.GetProvider(),
+			Type:           apicontracts.ApiKeyTypeCluster,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to register cluster %s", err)
@@ -140,20 +182,20 @@ func (r *RorAgentClientInterface) initKubernetesClusterSetup() error {
 		err = r.kubernetesCreateApiKeySecret(key)
 		if err != nil {
 			return fmt.Errorf("failed to create api key secret %s", err)
-
 		}
-	}
 
+	}
+	rorconfig.Set(configconsts.API_KEY, r.config.apiKey)
 	return nil
 }
 
-func (r *RorAgentClientInterface) kubernetesCreateApiKeySecret(apiKey string) error {
-	secret := &v1.Secret{
+func (r *rorAgentClient) kubernetesCreateApiKeySecret(apiKey string) error {
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.config.apiKeySecret,
 			Namespace: r.config.namespace,
 		},
-		Type: v1.SecretTypeOpaque,
+		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
 			"APIKEY": apiKey,
 		},
@@ -171,7 +213,7 @@ func (r *RorAgentClientInterface) kubernetesCreateApiKeySecret(apiKey string) er
 // kubernetesAuth sets the api key from the secret defined in the config value apiKeySecret
 // in the namespace defined in the config value namespace
 // if the secret does not exist, it will be created
-func (r *RorAgentClientInterface) kubernetesAuth() {
+func (r *rorAgentClient) kubernetesAuth() {
 
 	secret, err := r.k8sClientSet.GetSecret(r.config.namespace, r.config.apiKeySecret)
 	if err != nil {
@@ -186,17 +228,17 @@ func (r *RorAgentClientInterface) kubernetesAuth() {
 	r.config.apiKey = string(secret.Data["APIKEY"])
 }
 
-func (r *RorAgentClientInterface) initUnathorizedRorClient() {
+func (r *rorAgentClient) initUnathorizedRorClient() {
 	httptransportconfig := httpclient.HttpTransportClientConfig{
 		BaseURL:      r.config.apiEndpoint,
 		AuthProvider: httpauthprovider.NewNoAuthprovider(),
 		Role:         r.config.role,
-		Version:      r.config.rorVersion,
+		Version:      rorversion.GetRorVersion(),
 	}
 	rorclienttransport := resttransport.NewRorHttpTransport(&httptransportconfig)
 	r.rorAPIClient = rorclient.NewRorClient(rorclienttransport)
 }
-func (r *RorAgentClientInterface) initAuthorizedRorClient() error {
+func (r *rorAgentClient) initAuthorizedRorClient() error {
 
 	if r.config.apiKey == ERR_SECRET_NOT_FOUND {
 		return fmt.Errorf("API_KEY is not set in the configuration")
@@ -205,13 +247,13 @@ func (r *RorAgentClientInterface) initAuthorizedRorClient() error {
 	clientConfig := httpclient.HttpTransportClientConfig{
 		BaseURL:      r.config.apiEndpoint,
 		AuthProvider: authProvider,
-		Version:      r.config.rorVersion,
+		Version:      rorversion.GetRorVersion(),
 		Role:         r.config.role,
 	}
 	transport := resttransport.NewRorHttpTransport(&clientConfig)
 	r.rorAPIClient = rorclient.NewRorClient(transport)
-	if err := r.rorAPIClient.Ping(); err != nil {
-		return fmt.Errorf("failed to ping RorClient: %w", err)
+	if !r.rorAPIClient.Ping() {
+		return fmt.Errorf("failed to ping RorClient")
 	}
 
 	return nil

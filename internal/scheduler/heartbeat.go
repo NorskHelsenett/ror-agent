@@ -5,6 +5,7 @@ import (
 
 	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 
@@ -13,8 +14,8 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 )
 
-func HeartbeatReporting() error {
-	clusterReport, err := services.GetHeartbeatReport()
+func HeartbeatReporting(rorClientInterface clusteragentclient.RorAgentClientInterface) error {
+	clusterReport, err := services.GetHeartbeatReport(rorClientInterface)
 	if err != nil {
 		rlog.Error("error when getting heartbeat report", err)
 		return err

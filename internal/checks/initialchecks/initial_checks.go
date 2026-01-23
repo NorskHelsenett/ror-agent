@@ -7,10 +7,9 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/clients/rorapiclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
-
-	"github.com/spf13/viper"
 )
 
 // HasSuccessfullRorApiConnection checks whether there is a successful connection to the ROR API.
@@ -19,7 +18,7 @@ import (
 // Returns:
 // - (bool): True if the connection to the ROR API is successful, false otherwise.
 func HasSuccessfullRorApiConnection() error {
-	if viper.GetString(configconsts.API_ENDPOINT) == "" {
+	if rorconfig.GetString(configconsts.API_ENDPOINT) == "" {
 		return fmt.Errorf("ROR_URL is not set")
 	}
 

@@ -10,20 +10,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/k8smodels"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/nodeservice"
 	"github.com/NorskHelsenett/ror-agent/internal/models/argomodels"
 	"github.com/NorskHelsenett/ror-agent/internal/utils"
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
+	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -100,18 +101,18 @@ func NewAccessGroupsFromData(data map[string]string) accessGroups {
 	return accessGroups
 }
 
-func GetHeartbeatReport() (apicontracts.Cluster, error) {
+func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInterface) (apicontracts.Cluster, error) {
 
-	k8sClient, err := clients.Kubernetes.GetKubernetesClientset()
+	k8sClient, err := rorClientInterface.GetKubernetesClientset().GetKubernetesClientset()
 	if err != nil {
 		return apicontracts.Cluster{}, err
 	}
 
-	dynamicClient, err := clients.Kubernetes.GetDynamicClient()
+	dynamicClient, err := rorClientInterface.GetKubernetesClientset().GetDynamicClient()
 	if err != nil {
 		return apicontracts.Cluster{}, err
 	}
-	metricsClient, err := clients.Kubernetes.GetMetricsClient()
+	metricsClient, err := rorClientInterface.GetKubernetesClientset().GetMetricsClient()
 	if err != nil {
 		return apicontracts.Cluster{}, err
 	}
@@ -177,10 +178,10 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 		k8sCaCertificate = base64.StdEncoding.EncodeToString(caCertData)
 		rlog.Debug("Successfully read cluster CA certificate from service account")
 	} else {
-		rlog.Warn("Could not read CA certificate from service account", rlog.String("path", caCertPath), rlog.Any("error", err))
-
 		// Fallback: try to get it from REST config using the config package
+
 		if restConfig, err := rest.InClusterConfig(); err == nil {
+			rlog.Warn("Could not read CA certificate from service account", rlog.String("path", caCertPath), rlog.Any("error", err))
 			if len(restConfig.CAData) > 0 {
 				k8sCaCertificate = base64.StdEncoding.EncodeToString(restConfig.CAData)
 				rlog.Debug("Successfully read cluster CA certificate from REST config CAData")
@@ -193,7 +194,7 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 				}
 			}
 		} else {
-			rlog.Error("Could not get in-cluster config for CA certificate extraction", err)
+			rlog.Warn("Could not get in-cluster config for CA certificate extraction")
 		}
 	}
 
@@ -224,8 +225,8 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 		memoryConsumedSum = memoryConsumedSum + nodepool.Metrics.MemoryConsumed
 	}
 
-	agentVersion := viper.GetString(configconsts.VERSION)
-	agentSha := viper.GetString(configconsts.COMMIT)
+	agentVersion := rorversion.GetRorVersion().GetVersion()
+	agentSha := rorversion.GetRorVersion().GetCommit()
 
 	var created time.Time
 	kubeSystem := "kube-system"
@@ -241,7 +242,7 @@ func GetHeartbeatReport() (apicontracts.Cluster, error) {
 			AccessGroups: nhnToolingMetadata.AccessGroups,
 		},
 		Environment: nhnToolingMetadata.Environment,
-		ClusterId:   viper.GetString(configconsts.CLUSTER_ID),
+		ClusterId:   rorconfig.GetString(configconsts.CLUSTER_ID),
 		ClusterName: clusterName,
 		Ingresses:   ingresses,
 		Created:     created,
@@ -326,7 +327,7 @@ func getNhnToolingMetadata(k8sClient *kubernetes.Clientset, dynamicClient dynami
 		Environment:  "dev",
 	}
 
-	namespace := viper.GetString(configconsts.POD_NAMESPACE)
+	namespace := rorconfig.GetString(configconsts.POD_NAMESPACE)
 	nhnToolingConfigMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), "nhn-tooling", v1.GetOptions{
 		TypeMeta:        v1.TypeMeta{},
 		ResourceVersion: "",
@@ -439,10 +440,8 @@ func appendNodeToControlePlane(node *k8smodels.Node, controlPlane *apicontracts.
 }
 
 func appendNodeToNodePools(nodePools *[]apicontracts.NodePool, node *k8smodels.Node) {
-	rlog.Debug("", rlog.String("Clustername", node.ClusterName))
 	clusterNameSplit := strings.Split(node.ClusterName, "-")
 	machineNameSplit := strings.Split(node.MachineName, "-")
-	rlog.Debug("", rlog.Strings("machine name split", machineNameSplit))
 	var workerName string
 	if node.Provider == providermodels.ProviderTypeTalos {
 		workerName = node.Annotations["ror.io/node-pool"]
@@ -451,8 +450,6 @@ func appendNodeToNodePools(nodePools *[]apicontracts.NodePool, node *k8smodels.N
 	} else {
 		workerName = machineNameSplit[1]
 	}
-
-	rlog.Debug("", rlog.String("worker name", workerName))
 
 	apiNode := apicontracts.Node{
 		Role:                    "worker",

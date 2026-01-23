@@ -5,9 +5,10 @@ import (
 	"fmt"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
+	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/spf13/viper"
 )
 
 var client *resty.Client
@@ -19,9 +20,9 @@ func GetOrCreateRorClient() (*resty.Client, error) {
 	}
 
 	client = resty.New()
-	client.SetBaseURL(viper.GetString(configconsts.API_ENDPOINT))
-	client.Header.Add("X-API-KEY", viper.GetString(configconsts.API_KEY))
-	client.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", viper.GetString(configconsts.VERSION)))
+	client.SetBaseURL(rorconfig.GetString(configconsts.API_ENDPOINT))
+	client.Header.Add("X-API-KEY", rorconfig.GetString(configconsts.API_KEY))
+	client.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", rorversion.GetRorVersion().GetVersion()))
 
 	return client, nil
 }
@@ -32,8 +33,8 @@ func GetOrCreateRorClientNonAuth() (*resty.Client, error) {
 	}
 
 	clientNonAuth = resty.New()
-	clientNonAuth.SetBaseURL(viper.GetString(configconsts.API_ENDPOINT))
-	clientNonAuth.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", viper.GetString(configconsts.VERSION)))
+	clientNonAuth.SetBaseURL(rorconfig.GetString(configconsts.API_ENDPOINT))
+	clientNonAuth.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", rorversion.GetRorVersion().GetVersion()))
 
 	return clientNonAuth, nil
 }

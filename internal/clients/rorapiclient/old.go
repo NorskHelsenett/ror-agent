@@ -5,9 +5,10 @@ import (
 	"fmt"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
+	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/spf13/viper"
 )
 
 var rorclientnonauth *resty.Client
@@ -19,7 +20,7 @@ func GetOrCreateRorRestyClientNonAuth() (*resty.Client, error) {
 	}
 
 	rorclientnonauth = resty.New()
-	rorclientnonauth.SetBaseURL(viper.GetString(configconsts.API_ENDPOINT))
-	rorclientnonauth.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", viper.GetString(configconsts.VERSION)))
+	rorclientnonauth.SetBaseURL(rorconfig.GetString(configconsts.API_ENDPOINT))
+	rorclientnonauth.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", rorversion.GetRorVersion().GetVersion()))
 	return rorclientnonauth, nil
 }

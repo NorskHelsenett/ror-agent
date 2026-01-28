@@ -90,7 +90,6 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		return nil, err
 	}
 
-	rlog.Debug("Using kubernetes secret to get api-key")
 	err = client.getClusterAuthFromSecret()
 	if err != nil {
 		return nil, fmt.Errorf("Could not set cluster auth from secret: %s", err)
@@ -216,7 +215,7 @@ func (r *rorAgentClient) kubernetesCreateApiKeySecret(apiKey string) error {
 // if the secret is not found, it will return an error.
 // if clusterId is not found in the secret, it will set it to UNKNOWN_CLUSTER_ID
 func (r *rorAgentClient) getClusterAuthFromSecret() error {
-
+	rlog.Debug("Using kubernetes secret to get api-key")
 	secret, err := r.k8sClientSet.GetSecret(r.config.namespace, r.config.apiKeySecret)
 	if err != nil {
 		if errors.IsNotFound(err) {

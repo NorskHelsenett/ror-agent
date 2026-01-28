@@ -181,7 +181,7 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 		rlog.Info("api key secret not found, registering new key")
 
 		r.initUnathorizedRorClient()
-		resp, err := r.rorAPIClient.ClustersV2().Register(clustersapi.RegisterClusterRequest{
+		resp, err := r.rorAPIClient.ApiKeysV2().RegisterAgent(clustersapi.RegisterClusterRequest{
 			ClusterId: r.config.clusterId,
 		})
 		if err != nil {

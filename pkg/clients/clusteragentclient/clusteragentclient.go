@@ -175,6 +175,7 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 	if r.config.clusterId == UNKNOWN_CLUSTER_ID {
 		rlog.Info("Using cluster id from interregator", rlog.String("cluster id", interregatorClusterid))
 		r.config.clusterId = interregatorClusterid
+		r.kubernetesUpdateApiKeySecret()
 	}
 
 	// TODO: use v2 og clusters/register endpoint to register cluster if cluster id is unknown
@@ -192,7 +193,8 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 		if err != nil {
 			return fmt.Errorf("failed to register cluster %s", err)
 		}
-		err = r.kubernetesCreateApiKeySecret(key)
+		r.config.apiKey = key
+		err = r.kubernetesCreateApiKeySecret()
 		if err != nil {
 			return fmt.Errorf("failed to create api key secret %s", err)
 		}
@@ -205,7 +207,7 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 	return nil
 }
 
-func (r *rorAgentClient) kubernetesCreateApiKeySecret(apiKey string) error {
+func (r *rorAgentClient) kubernetesCreateApiKeySecret() error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.config.apiKeySecret,
@@ -213,7 +215,8 @@ func (r *rorAgentClient) kubernetesCreateApiKeySecret(apiKey string) error {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"APIKEY": apiKey,
+			"APIKEY":     r.config.apiKey,
+			"CLUSTER_ID": r.config.clusterId,
 		},
 	}
 	_, err := r.k8sClientSet.CreateSecret(r.config.namespace, secret)
@@ -221,7 +224,33 @@ func (r *rorAgentClient) kubernetesCreateApiKeySecret(apiKey string) error {
 		rlog.Error("failed to create api key secret", err)
 		return err
 	}
-	r.config.apiKey = apiKey
+	return nil
+
+}
+func (r *rorAgentClient) kubernetesUpdateApiKeySecret() error {
+	var hasChanged bool
+	secret, err := r.k8sClientSet.GetSecret(r.config.namespace, r.config.apiKeySecret)
+	if err != nil {
+		rlog.Error("failed to get api key secret for update", err)
+		return err
+	}
+
+	if r.config.apiKey != UNKNOWN_API_KEY && string(secret.Data["APIKEY"]) != r.config.apiKey {
+		secret.Data["APIKEY"] = []byte(r.config.apiKey)
+		hasChanged = true
+	}
+	if r.config.clusterId != UNKNOWN_CLUSTER_ID && string(secret.Data["CLUSTER_ID"]) != r.config.clusterId {
+		secret.Data["CLUSTER_ID"] = []byte(r.config.clusterId)
+		hasChanged = true
+	}
+	if !hasChanged {
+		return nil
+	}
+	_, err = r.k8sClientSet.SetSecret(r.config.namespace, secret)
+	if err != nil {
+		rlog.Error("failed to update api key secret", err)
+		return err
+	}
 	return nil
 
 }

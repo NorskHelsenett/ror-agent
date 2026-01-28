@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/NorskHelsenett/ror/pkg/apicontracts"
+	"github.com/NorskHelsenett/ror/pkg/apicontracts/clustersapi/v2"
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport"
@@ -158,7 +158,6 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 	// check if api endpoint is accessible
 
 	//Check if we know the cluster id
-
 	secretClusterid := r.config.clusterId
 	interregatorClusterid := r.config.interregator.GetClusterId()
 
@@ -183,17 +182,13 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 		rlog.Info("api key secret not found, registering new key")
 
 		r.initUnathorizedRorClient()
-		key, err := r.rorAPIClient.Clusters().Register(apicontracts.AgentApiKeyModel{
-			Identifier:     r.config.interregator.GetClusterName(),
-			DatacenterName: r.config.interregator.GetDatacenter(),
-			WorkspaceName:  r.config.interregator.GetClusterWorkspace(),
-			Provider:       r.config.interregator.GetProvider(),
-			Type:           apicontracts.ApiKeyTypeCluster,
+		resp, err := r.rorAPIClient.ClustersV2().Register(clustersapi.RegisterClusterRequest{
+			ClusterId: r.config.clusterId,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to register cluster %s", err)
 		}
-		r.config.apiKey = key
+		r.config.apiKey = resp.ApiKey
 		err = r.kubernetesCreateApiKeySecret()
 		if err != nil {
 			return fmt.Errorf("failed to create api key secret %s", err)

@@ -28,9 +28,8 @@ import (
 )
 
 const (
-	ERR_SECRET_NOT_FOUND = "___secret_not_found___"
-	UNKNOWN_CLUSTER_ID   = "unknown_cluster_id"
-	UNKNOWN_API_KEY      = "unknown_api_key"
+	UNKNOWN_CLUSTER_ID = "___unknown_cluster_id___"
+	UNKNOWN_API_KEY    = "___unknown_api_key___"
 )
 
 type RorAgentClientInterface interface {
@@ -57,7 +56,7 @@ type rorAgentClient struct {
 }
 
 func GetDefaultRorAgentClientConfig() *RorAgentClientConfig {
-	rorconfig.SetDefault(configconsts.API_KEY, ERR_SECRET_NOT_FOUND)
+	rorconfig.SetDefault(configconsts.API_KEY, UNKNOWN_API_KEY)
 	return &RorAgentClientConfig{
 		role:         rorconfig.GetString(configconsts.ROLE),
 		namespace:    rorconfig.GetString(configconsts.POD_NAMESPACE),
@@ -291,7 +290,7 @@ func (r *rorAgentClient) initUnathorizedRorClient() {
 }
 func (r *rorAgentClient) initAuthorizedRorClient() error {
 
-	if r.config.apiKey == ERR_SECRET_NOT_FOUND {
+	if r.config.apiKey == UNKNOWN_API_KEY {
 		return fmt.Errorf("API_KEY is not set in the configuration")
 	}
 	authProvider := httpauthprovider.NewAuthProvider(httpauthprovider.AuthPoviderTypeAPIKey, r.config.apiKey)

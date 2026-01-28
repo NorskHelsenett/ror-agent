@@ -30,6 +30,7 @@ import (
 const (
 	ERR_SECRET_NOT_FOUND = "___secret_not_found___"
 	UNKNOWN_CLUSTER_ID   = "unknown_cluster_id"
+	UNKNOWN_API_KEY      = "unknown_api_key"
 )
 
 type RorAgentClientInterface interface {
@@ -220,7 +221,9 @@ func (r *rorAgentClient) getClusterAuthFromSecret() error {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			rlog.Warn("api key secret not found")
-			return err
+			r.config.clusterId = UNKNOWN_CLUSTER_ID
+			r.config.apiKey = UNKNOWN_API_KEY
+			return nil
 		} else {
 			rlog.Error("failed to get api key secret", err)
 			return err
@@ -232,6 +235,9 @@ func (r *rorAgentClient) getClusterAuthFromSecret() error {
 		r.config.clusterId = UNKNOWN_CLUSTER_ID
 	}
 	r.config.apiKey = string(secret.Data["APIKEY"])
+	if r.config.apiKey == "" {
+		r.config.apiKey = UNKNOWN_API_KEY
+	}
 	return nil
 }
 

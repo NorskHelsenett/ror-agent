@@ -27,7 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-const ERR_SECRET_NOT_FOUND = "___secret_not_found___"
+const (
+	ERR_SECRET_NOT_FOUND = "___secret_not_found___"
+	UNKNOWN_CLUSTER_ID   = "unknown_cluster_id"
+)
 
 type RorAgentClientInterface interface {
 	GetRorClient() rorclient.RorClientInterface
@@ -40,6 +43,7 @@ type RorAgentClientConfig struct {
 	role         string
 	namespace    string
 	apiEndpoint  string
+	clusterId    string
 	apiKey       string
 	apiKeySecret string
 	interregator interregatortypes.ClusterInterregator
@@ -62,68 +66,66 @@ func GetDefaultRorAgentClientConfig() *RorAgentClientConfig {
 	}
 }
 
+func NewRorAgentClientWithDefaults() (RorAgentClientInterface, error) {
+	return NewRorAgentClient(GetDefaultRorAgentClientConfig())
+}
+
 func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, error) {
-	var err error
-
-	// Create a pointer to the struct
-	rorClient := &rorAgentClient{}
-
-	if config != nil {
-		rorClient.config = *config
-	} else {
-		rorClient.config = *GetDefaultRorAgentClientConfig()
+	if config == nil {
+		return nil, fmt.Errorf("config cannot be nil, please use NewRorAgentClientWithDefaults if no custom config is needed")
 	}
 
-	rorClient.k8sClientSet = kubernetesclient.MustInitializeKubernetesClient()
-
-	if rorClient.k8sClientSet != nil {
-		k8sclientset, err := rorClient.k8sClientSet.GetKubernetesClientset()
-		if err != nil {
-			rlog.Error("failed to get kubernetes clientset", err)
-			return nil, err
-		}
-
-		rorClient.config.interregator = clusterinterregator.NewClusterInterregatorFromKubernetesClient(k8sclientset)
-
-		if rorClient.config.interregator.GetProvider() == providermodels.ProviderTypeUnknown {
-			rlog.Error("could not determine provider type", fmt.Errorf("unknown provider"))
-			return nil, fmt.Errorf("could not determine provider type")
-		}
-
-		rlog.Debug("Using kubernetes secret to get api-key")
-		rorClient.kubernetesAuth()
-
-		err = rorClient.initKubernetesClusterSetup()
-		if err != nil {
-			rlog.Error("failed to initialize kubernetes cluster setup", err)
-			return nil, err
-		}
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
-	err = rorClient.initAuthorizedRorClient()
+	client := &rorAgentClient{
+		config:       *config,
+		k8sClientSet: kubernetesclient.MustInitializeKubernetesClient(),
+	}
+
+	err := client.initInterregator()
+	if err != nil {
+		rlog.Error("failed to initialize interregator", err)
+		return nil, err
+	}
+
+	rlog.Debug("Using kubernetes secret to get api-key")
+	err = client.getClusterAuthFromSecret()
+	if err != nil {
+		return nil, fmt.Errorf("Could not set cluster auth from secret: %s", err)
+	}
+
+	err = client.initKubernetesClusterSetup()
+	if err != nil {
+		rlog.Error("failed to initialize kubernetes cluster setup", err)
+		return nil, err
+	}
+
+	err = client.initAuthorizedRorClient()
 	if err != nil {
 		rlog.Error("failed to setup RorClient", err)
 		return nil, err
 	}
 
-	ver, err := rorClient.rorAPIClient.Info().GetVersion(context.TODO())
+	ver, err := client.rorAPIClient.Info().GetVersion(context.TODO())
 	if err != nil {
 		return nil, err
 	}
 
-	selfdata, err := rorClient.rorAPIClient.Clusters().GetSelf()
+	selfdata, err := client.rorAPIClient.Clusters().GetSelf()
 	if err != nil {
 		return nil, err
 	}
 
 	rlog.Info("connected to ror-api", rlog.String("version", ver), rlog.String("clusterid", selfdata.ClusterId))
-	rorClient.rorAPIClient.SetOwnerref(rorresourceowner.RorResourceOwnerReference{
+	client.rorAPIClient.SetOwnerref(rorresourceowner.RorResourceOwnerReference{
 		Scope:   aclmodels.Acl2ScopeCluster,
 		Subject: aclmodels.Acl2Subject(selfdata.ClusterId),
 	})
 	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.ClusterId)
 
-	return rorClient, nil
+	return client, nil
 }
 
 func (r *rorAgentClient) GetRorClient() rorclient.RorClientInterface {
@@ -210,22 +212,28 @@ func (r *rorAgentClient) kubernetesCreateApiKeySecret(apiKey string) error {
 
 }
 
-// kubernetesAuth sets the api key from the secret defined in the config value apiKeySecret
-// in the namespace defined in the config value namespace
-// if the secret does not exist, it will be created
-func (r *rorAgentClient) kubernetesAuth() {
+// getClusterAuthFromSecret sets the clusterI and api-key from the secret defined in the config value apiKeySecret
+// if the secret is not found, it will return an error.
+// if clusterId is not found in the secret, it will set it to UNKNOWN_CLUSTER_ID
+func (r *rorAgentClient) getClusterAuthFromSecret() error {
 
 	secret, err := r.k8sClientSet.GetSecret(r.config.namespace, r.config.apiKeySecret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			rlog.Warn("api key secret not found")
-			return
+			return err
 		} else {
 			rlog.Error("failed to get api key secret", err)
-			return
+			return err
 		}
 	}
+
+	r.config.clusterId = string(secret.Data["CLUSTER_ID"])
+	if r.config.clusterId == "" {
+		r.config.clusterId = UNKNOWN_CLUSTER_ID
+	}
 	r.config.apiKey = string(secret.Data["APIKEY"])
+	return nil
 }
 
 func (r *rorAgentClient) initUnathorizedRorClient() {
@@ -257,4 +265,38 @@ func (r *rorAgentClient) initAuthorizedRorClient() error {
 	}
 
 	return nil
+}
+
+func (c *rorAgentClient) initInterregator() error {
+	k8sclientset, err := c.k8sClientSet.GetKubernetesClientset()
+	if err != nil {
+		rlog.Error("failed to get kubernetes clientset", err)
+		return err
+	}
+
+	c.config.interregator = clusterinterregator.NewClusterInterregatorFromKubernetesClient(k8sclientset)
+
+	// Verify that we know the provider type
+	if c.config.interregator.GetProvider() == providermodels.ProviderTypeUnknown {
+		rlog.Error("could not determine provider type", fmt.Errorf("unknown provider"))
+		return fmt.Errorf("could not determine provider type")
+	}
+	return nil
+}
+
+func (c *RorAgentClientConfig) Validate() error {
+	if c.role == "" {
+		return fmt.Errorf("role cannot be empty")
+	}
+	if c.namespace == "" {
+		return fmt.Errorf("namespace cannot be empty")
+	}
+	if c.apiEndpoint == "" {
+		return fmt.Errorf("apiEndpoint cannot be empty")
+	}
+	if c.apiKeySecret == "" {
+		return fmt.Errorf("apiKeySecret cannot be empty")
+	}
+	return nil
+
 }

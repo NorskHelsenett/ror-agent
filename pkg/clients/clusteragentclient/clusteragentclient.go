@@ -96,7 +96,7 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		return nil, fmt.Errorf("Could not set cluster auth from secret: %s", err)
 	}
 
-	err = client.initKubernetesClusterSetup()
+	err = client.initRorAgentClientSetup()
 	if err != nil {
 		rlog.Error("failed to initialize kubernetes cluster setup", err)
 		return nil, err
@@ -146,29 +146,40 @@ func (r *rorAgentClient) PingRorAPI() error {
 	return fmt.Errorf("could not ping ror-api")
 }
 
-func (r *rorAgentClient) initKubernetesClusterSetup() error {
+// initRorAgentClientSetup initializes the kubernetes cluster setup by verifying access to the namespace, api endpoint and cluster id.
+func (r *rorAgentClient) initRorAgentClientSetup() error {
 
-	// check if namespace is set and accessible
-	if r.config.namespace == "" {
-		return fmt.Errorf("failed to get namespace")
-	}
+	// check if namespace is accessible
 	_, err := r.k8sClientSet.GetNamespace(r.config.namespace)
 	if err != nil {
 		return fmt.Errorf("failed to get namespace %s", err)
 	}
 
-	// check if api endpoint is set and accessible
-	if r.config.apiEndpoint == "" {
-		return fmt.Errorf("failed to get api endpoint")
-	}
+	// check if api endpoint is accessible
 
 	//Check if we know the cluster id
-	if r.config.interregator.GetClusterId() != providermodels.UNKNOWN_CLUSTER_ID {
-		rlog.Info("cluster id found from interregator", rlog.String("cluster id", r.config.interregator.GetClusterId()))
+
+	secretClusterid := r.config.clusterId
+	interregatorClusterid := r.config.interregator.GetClusterId()
+
+	if (secretClusterid == UNKNOWN_CLUSTER_ID) && (interregatorClusterid == providermodels.UNKNOWN_CLUSTER_ID) {
+		return fmt.Errorf("cluster id not found in secret or interregator")
 	}
 
-	if r.config.apiKey == ERR_SECRET_NOT_FOUND {
-		rlog.Info("api key secret not found, interregating cluster and registering new key")
+	if secretClusterid != interregatorClusterid {
+		rlog.Warn("cluster id in secret does not match interregator cluster id, using secret cluster id",
+			rlog.String("secret cluster id", secretClusterid),
+			rlog.String("interregator cluster id", interregatorClusterid))
+	}
+
+	if r.config.clusterId == UNKNOWN_CLUSTER_ID {
+		rlog.Info("Using cluster id from interregator", rlog.String("cluster id", interregatorClusterid))
+		r.config.clusterId = interregatorClusterid
+	}
+
+	// TODO: use v2 og clusters/register endpoint to register cluster if cluster id is unknown
+	if r.config.apiKey == UNKNOWN_API_KEY {
+		rlog.Info("api key secret not found, registering new key")
 
 		r.initUnathorizedRorClient()
 		key, err := r.rorAPIClient.Clusters().Register(apicontracts.AgentApiKeyModel{
@@ -187,6 +198,9 @@ func (r *rorAgentClient) initKubernetesClusterSetup() error {
 		}
 
 	}
+
+	// Setting the config env values for cluster id and api key for backward compatibility
+	rorconfig.Set(configconsts.CLUSTER_ID, r.config.clusterId)
 	rorconfig.Set(configconsts.API_KEY, r.config.apiKey)
 	return nil
 }

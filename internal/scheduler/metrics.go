@@ -94,7 +94,7 @@ func CreateNodeMetricsList(k8sClient *kubernetes.Clientset) ([]apicontracts.Node
 
 	data, err := k8sClient.RESTClient().Get().AbsPath("apis/metrics.k8s.io/v1beta1/nodes").DoRaw(context.TODO())
 	if err != nil {
-		rlog.Error("error converting podmetrics", err)
+		rlog.Error("error converting nodemetrics", err)
 		return metricsReportNodes, err
 	}
 

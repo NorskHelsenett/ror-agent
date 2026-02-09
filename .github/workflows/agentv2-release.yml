@@ -47,7 +47,7 @@ jobs:
           mkdir -p dist/isbuilt
           CGO_ENABLED=0 go build -o dist/${{ env.APP }} -ldflags "-w -extldflags '-static' -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Version=${{ needs.setenv.outputs.rorversion}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Commit=${{ needs.setenv.outputs.shortsha}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.LibVer=${{ needs.setenv.outputs.libver}}" ${{ env.APP_PATH }}/main.go
           touch dist/isbuilt/${{ env.APP }}
-    - name: Archive binary
+    - name: Archive binary and SBOM
       uses: actions/upload-artifact@v4
       with:
         name: binary-build
@@ -65,6 +65,9 @@ jobs:
       contents: read
       packages: write
       id-token: write
+    outputs:
+      image-digest: ${{ steps.build-and-push.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -109,6 +112,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          sbom: true
+          provenance: true
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}
         env:
@@ -140,13 +145,37 @@ jobs:
         env:
           VERSION: v4.44.5
           BINARY: yq_linux_amd64
+      - name: Install cosign
+        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
       - name: Build helm chart
+        id: helm-push
         run: |
           export HELM_VERSION=${ROR_VERSION#v*}
           ./yq e -i '.version = strenv(HELM_VERSION),.appVersion = strenv(ROR_VERSION)' charts/ror-cluster-agent-v2/Chart.yaml
           ./yq e -i '.image.tag = strenv(ROR_VERSION),.image.repository = "ghcr.io/norskhelsenett/${{ env.APP }}"' charts/ror-cluster-agent-v2/values.yaml
           helm package charts/ror-cluster-agent-v2
           echo  ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ${{ env.REGISTRY }} --password-stdin
-          helm push ${{ env.APP }}-${HELM_VERSION}.tgz oci://${{ env.REGISTRY }}/norskhelsenett/helm/
+          HELM_PUSH_OUTPUT=$(helm push ${{ env.APP }}-${HELM_VERSION}.tgz oci://${{ env.REGISTRY }}/norskhelsenett/helm/ 2>&1)
+          echo "$HELM_PUSH_OUTPUT"
+          HELM_DIGEST=$(echo "$HELM_PUSH_OUTPUT" | grep "^Digest:" | cut -d' ' -f2)
+          echo "digest=${HELM_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "repository=${{ env.REGISTRY }}/norskhelsenett/helm/${{ env.APP }}" >> "$GITHUB_OUTPUT"
+          echo "Captured digest: ${HELM_DIGEST}"
+        env:
+          ROR_VERSION: ${{ needs.setenv.outputs.rorversion }}
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sign Helm chart
+        if: steps.helm-push.outputs.digest != ''
+        run: |
+          echo "Signing helm chart with digest: ${{ steps.helm-push.outputs.digest }}"
+          cosign sign --yes ${{ steps.helm-push.outputs.repository }}@${{ steps.helm-push.outputs.digest }}
         env:
           ROR_VERSION: ${{ needs.setenv.outputs.rorversion }}

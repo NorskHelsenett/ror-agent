@@ -5,6 +5,7 @@ import (
 	"os"
 
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
+	"github.com/NorskHelsenett/ror/pkg/rorresources/rordefs"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -18,7 +19,6 @@ type DynamicClientHandler interface {
 	AddResource(obj any)
 	DeleteResource(obj any)
 	UpdateResource(_ any, obj any)
-	GetSchemas() []schema.GroupVersionResource
 }
 
 func Start(k *kubernetesclient.K8sClientsets, dynamichandler DynamicClientHandler, stop chan struct{}, sigs chan os.Signal) error {
@@ -34,7 +34,7 @@ func Start(k *kubernetesclient.K8sClientsets, dynamichandler DynamicClientHandle
 		return err
 	}
 
-	schemas := dynamichandler.GetSchemas()
+	schemas := getSchemas()
 	for _, schema := range schemas {
 		check, err := discovery.IsResourceEnabled(discoveryClient, schema)
 		if err != nil {
@@ -51,6 +51,10 @@ func Start(k *kubernetesclient.K8sClientsets, dynamichandler DynamicClientHandle
 		}
 	}
 	return nil
+}
+
+func getSchemas() []schema.GroupVersionResource {
+	return rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent)
 }
 
 type DynamicWatcher struct {

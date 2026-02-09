@@ -252,7 +252,7 @@ func (r *rorAgentClient) initAuthorizedRorClient() error {
 	}
 	transport := resttransport.NewRorHttpTransport(&clientConfig)
 	r.rorAPIClient = rorclient.NewRorClient(transport)
-	if err := r.rorAPIClient.Ping(); err != nil {
+	if err := r.rorAPIClient.CheckConnection(); err != nil {
 		return fmt.Errorf("failed to ping RorClient: %w", err)
 	}
 

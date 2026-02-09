@@ -1,114 +1,64 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror-agent/internal/controllers"
-	"github.com/NorskHelsenett/ror-agent/internal/httpserver"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
 
-	"github.com/NorskHelsenett/ror-agent/internal/checks/initialchecks"
-	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/operator/initialize"
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
-	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	"syscall"
 
-	"github.com/spf13/viper"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
-
-	// https://blog.devgenius.io/know-gomaxprocs-before-deploying-your-go-app-to-kubernetes-7a458fb63af1
-
-	"go.uber.org/automaxprocs/maxprocs"
 )
 
-// init
-func init() {
-	_, _ = maxprocs.Set(maxprocs.Logger(rlog.Infof))
-	config.Init()
-}
-
 func main() {
+	config.Init()
 	_ = "rebuild 6"
-	rlog.Info("Agent is starting", rlog.String("version", viper.GetString(configconsts.VERSION)))
+	rlog.Info("Agent is starting", rlog.String("version", rorversion.GetRorVersion().GetVersion()))
 	sigs := make(chan os.Signal, 1)                                    // Create channel to receive os signals
 	stop := make(chan struct{})                                        // Create channel to receive stop signal
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT) // Register the sigs channel to receieve SIGTERM
 
 	go func() {
 		services.GetEgressIp()
-		sig := <-sigs
-		_, _ = fmt.Println()
-		_, _ = fmt.Print(sig)
-		stop <- struct{}{}
 	}()
 
-	clients.Initialize()
-
-	k8sClient, err := clients.Kubernetes.GetKubernetesClientset()
+	rorClientInterface, err := clusteragentclient.NewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
 	if err != nil {
-		panic(err.Error())
+		rlog.Fatal("could not get RorClientInterface", err)
 	}
 
-	discoveryClient, err := clients.Kubernetes.GetDiscoveryClient()
+	discoveryClient, err := rorClientInterface.GetKubernetesClientset().GetDiscoveryClient()
 	if err != nil {
 		rlog.Error("failed to get discovery client", err)
 	}
 
-	dynamicClient, err := clients.Kubernetes.GetDynamicClient()
+	dynamicClient, err := rorClientInterface.GetKubernetesClientset().GetDynamicClient()
 	if err != nil {
 		rlog.Error("failed to get dynamic client", err)
 	}
-
-	ns := viper.GetString(configconsts.POD_NAMESPACE)
-	if ns == "" {
-		rlog.Fatal("POD_NAMESPACE is not set", nil)
-	}
-
-	_, err = k8sClient.CoreV1().Namespaces().Get(context.Background(), ns, metav1.GetOptions{})
-	if err != nil {
-		rlog.Fatal("could not get namespace", err)
-	}
-
-	err = initialchecks.HasSuccessfullRorApiConnection()
-	if err != nil {
-		rlog.Fatal("could not connect to ror-api", err)
-	}
-
-	err = services.ExtractApikeyOrDie()
-	if err != nil {
-		rlog.Fatal("could not get or create secret", err)
-	}
-
-	clusterId, err := initialize.GetOwnClusterId()
-	if err != nil {
-		rlog.Fatal("could not fetch clusterid from ror-api", err)
-	}
-	viper.Set(configconsts.CLUSTER_ID, clusterId)
 
 	err = resourceupdate.ResourceCache.Init()
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 
-	err = scheduler.HeartbeatReporting()
+	err = scheduler.HeartbeatReporting(rorClientInterface)
 	if err != nil {
 		rlog.Fatal("could not send heartbeat to api", err)
 	}
-
-	// waiting for ip check to finish :)
-	time.Sleep(time.Second * 1)
 
 	schemas := clients.InitSchema()
 
@@ -133,15 +83,7 @@ func main() {
 		}
 	}
 
-	go func() {
-		httpserver.InitHttpServer()
-		sig := <-sigs
-		_, _ = fmt.Println()
-		_, _ = fmt.Println(sig)
-		stop <- struct{}{}
-	}()
-
-	scheduler.SetUpScheduler()
+	scheduler.SetUpScheduler(rorClientInterface)
 
 	<-stop
 	rlog.Info("Shutting down...")

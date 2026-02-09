@@ -8,6 +8,7 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
@@ -19,8 +20,8 @@ import (
 )
 
 // TODO: Change to use RorClient
-func MetricsReporting() error {
-	k8sClient, err := clients.Kubernetes.GetKubernetesClientset()
+func MetricsReporting(rorClientInterface clusteragentclient.RorAgentClientInterface) error {
+	k8sClient, err := rorClientInterface.GetKubernetesClientset().GetKubernetesClientset()
 	if err != nil {
 		return err
 	}

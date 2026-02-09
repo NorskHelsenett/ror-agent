@@ -115,12 +115,11 @@ func getResourceHashList() (hashList, error) {
 		return hashlist, err
 	} else {
 		config.ResetErrorCount()
-		rlog.Info("hashList fetched from ror-api")
-
 		err = json.Unmarshal(response.Body(), &hashlist)
 		if err != nil {
 			rlog.Error("could not unmarshal reply", err)
 		}
+		rlog.Info("got hashList from ror-api, length:", rlog.Int("length", len(hashlist.Items)))
 	}
 	return hashlist, nil
 }

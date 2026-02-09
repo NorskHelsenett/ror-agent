@@ -2,6 +2,7 @@
 package clients
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,7 +70,7 @@ func NewRorClientInterface() (rorclient.RorClientInterface, error) {
 		return nil, err
 	}
 
-	ver, err := rorClient.rorAPIClient.Info().GetVersion()
+	ver, err := rorClient.rorAPIClient.Info().GetVersion(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +211,7 @@ func (r *RorAgentClientInterface) initAuthorizedRorClient() error {
 	}
 	transport := resttransport.NewRorHttpTransport(&clientConfig)
 	r.rorAPIClient = rorclient.NewRorClient(transport)
-	if err := r.rorAPIClient.Ping(); err != nil {
+	if err := r.rorAPIClient.CheckConnection(); err != nil {
 		return fmt.Errorf("failed to ping RorClient: %w", err)
 	}
 

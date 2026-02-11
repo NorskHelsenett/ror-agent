@@ -12,8 +12,8 @@ import (
 )
 
 var client *resty.Client
-var clientNonAuth *resty.Client
 
+// DEPRECATED: use GetRorClient from pkg/clients/rorclient/client.go
 func GetOrCreateRorClient() (*resty.Client, error) {
 	if client != nil {
 		return client, nil
@@ -25,16 +25,4 @@ func GetOrCreateRorClient() (*resty.Client, error) {
 	client.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", rorversion.GetRorVersion().GetVersion()))
 
 	return client, nil
-}
-
-func GetOrCreateRorClientNonAuth() (*resty.Client, error) {
-	if clientNonAuth != nil {
-		return clientNonAuth, nil
-	}
-
-	clientNonAuth = resty.New()
-	clientNonAuth.SetBaseURL(rorconfig.GetString(configconsts.API_ENDPOINT))
-	clientNonAuth.Header.Set("User-Agent", fmt.Sprintf("ROR-Agent/%s", rorversion.GetRorVersion().GetVersion()))
-
-	return clientNonAuth, nil
 }

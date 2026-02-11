@@ -25,20 +25,21 @@ func sendResourceUpdateToRor(resourceUpdate *apiresourcecontracts.ResourceUpdate
 	var url string
 	var response *resty.Response
 
-	if resourceUpdate.Action == apiresourcecontracts.K8sActionAdd {
+	switch resourceUpdate.Action {
+	case apiresourcecontracts.K8sActionAdd:
 		url = "/v1/resources"
 		response, err = rorClient.R().
 			SetHeader("Content-Type", "application/json").
 			SetBody(resourceUpdate).
 			Post(url)
 
-	} else if resourceUpdate.Action == apiresourcecontracts.K8sActionUpdate {
+	case apiresourcecontracts.K8sActionUpdate:
 		url = "/v1/resources/uid/" + resourceUpdate.Uid
 		response, err = rorClient.R().
 			SetHeader("Content-Type", "application/json").
 			SetBody(resourceUpdate).
 			Put(url)
-	} else if resourceUpdate.Action == apiresourcecontracts.K8sActionDelete {
+	case apiresourcecontracts.K8sActionDelete:
 		url = "/v1/resources/uid/" + resourceUpdate.Uid
 		response, err = rorClient.R().
 			SetHeader("Content-Type", "application/json").

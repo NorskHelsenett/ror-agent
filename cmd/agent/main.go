@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 
@@ -14,6 +16,8 @@ import (
 
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
+	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
@@ -30,6 +34,16 @@ func main() {
 	sigs := make(chan os.Signal, 1)                                    // Create channel to receive os signals
 	stop := make(chan struct{})                                        // Create channel to receive stop signal
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT) // Register the sigs channel to receieve SIGTERM
+
+	if rorconfig.GetBool(configconsts.ENABLE_PPROF) {
+		go func() {
+			rlog.Info("Starting pprof server on port 6060")
+			err := http.ListenAndServe("localhost:6060", nil)
+			if err != nil {
+				rlog.Fatal("could not start pprof server", err)
+			}
+		}()
+	}
 
 	go func() {
 		services.GetEgressIp()
@@ -50,14 +64,9 @@ func main() {
 		rlog.Error("failed to get dynamic client", err)
 	}
 
-	err = resourceupdate.ResourceCache.Init()
+	err = resourceupdate.ResourceCache.Init(rorClientInterface)
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
-	}
-
-	err = scheduler.HeartbeatReporting(rorClientInterface)
-	if err != nil {
-		rlog.Fatal("could not send heartbeat to api", err)
 	}
 
 	schemas := clients.InitSchema()

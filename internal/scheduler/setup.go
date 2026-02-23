@@ -20,6 +20,5 @@ func SetUpScheduler(rorClientInterface clusteragentclient.RorAgentClientInterfac
 	if err != nil {
 		rlog.Fatal("Failed to setup metric schedule", err)
 	}
-	_ = scheduler.RunByTag("heartbeat")
 	scheduler.StartAsync()
 }

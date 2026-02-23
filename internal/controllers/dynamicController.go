@@ -158,108 +158,129 @@ func (c *DynamicController) runNoCacheWatcher(stop <-chan struct{}) {
 	resourceVersion := ""
 
 	for {
-		select {
-		case <-stop:
+		if shouldStop(stop) {
 			return
-		default:
 		}
 
 		if resourceVersion == "" {
-			// Initial list (paged)
-			cont := ""
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-				}
-
-				list, err := c.client.Resource(c.resource).List(context.Background(), metav1.ListOptions{Limit: 500, Continue: cont})
-				if err != nil {
-					rlog.Error("dynamic no-cache list failed", err, rlog.Any("gvr", c.resource.String()))
-					time.Sleep(backoff)
-					if backoff < 30*time.Second {
-						backoff *= 2
-					}
-					break
-				}
-				backoff = time.Second
-
-				for i := range list.Items {
-					obj := &list.Items[i]
-					addResource(obj)
-				}
-
-				resourceVersion = list.GetResourceVersion()
-				cont = list.GetContinue()
-				if cont == "" {
-					maybeForceGCAfterInitialList(c.resource.String())
-					break
-				}
-			}
-			if resourceVersion == "" {
+			rv, ok := c.noCacheInitialList(stop, &backoff)
+			if !ok {
 				// list failed; retry outer loop
 				continue
 			}
+			resourceVersion = rv
 		}
 
-		w, err := c.client.Resource(c.resource).Watch(context.Background(), metav1.ListOptions{ResourceVersion: resourceVersion, AllowWatchBookmarks: true})
-		if err != nil {
-			rlog.Error("dynamic no-cache watch failed", err, rlog.Any("gvr", c.resource.String()))
-			time.Sleep(backoff)
-			if backoff < 30*time.Second {
-				backoff *= 2
-			}
+		rv, forceRelist := c.noCacheWatch(stop, resourceVersion, &backoff)
+		if shouldStop(stop) {
+			return
+		}
+		if forceRelist {
+			resourceVersion = ""
 			continue
 		}
-		backoff = time.Second
+		resourceVersion = rv
+	}
+}
 
-		for {
-			select {
-			case <-stop:
-				w.Stop()
-				return
-			case evt, ok := <-w.ResultChan():
-				if !ok {
-					w.Stop()
-					// restart watch loop
-					goto restart
-				}
+func shouldStop(stop <-chan struct{}) bool {
+	select {
+	case <-stop:
+		return true
+	default:
+		return false
+	}
+}
 
-				u, ok := evt.Object.(*unstructured.Unstructured)
-				if !ok || u == nil {
-					// Ignore Status/error objects here; reconnect on Error events below
-					if evt.Type == "ERROR" {
-						w.Stop()
-						resourceVersion = "" // force re-list
-						goto restart
-					}
-					continue
-				}
+func increaseBackoff(backoff time.Duration) time.Duration {
+	if backoff < 30*time.Second {
+		backoff *= 2
+	}
+	return backoff
+}
 
-				if rv := u.GetResourceVersion(); rv != "" {
-					resourceVersion = rv
-				}
+func (c *DynamicController) noCacheInitialList(stop <-chan struct{}, backoff *time.Duration) (string, bool) {
+	cont := ""
+	resourceVersion := ""
 
-				switch evt.Type {
-				case "ADDED":
-					addResource(u)
-				case "MODIFIED":
-					updateResource(nil, u)
-				case "DELETED":
-					deleteResource(u)
-				case "BOOKMARK":
-					// only updates resourceVersion
-				case "ERROR":
-					w.Stop()
-					resourceVersion = "" // force re-list
-					goto restart
-				}
-			}
+	for {
+		if shouldStop(stop) {
+			return "", false
 		}
 
-	restart:
-		continue
+		list, err := c.client.Resource(c.resource).List(context.Background(), metav1.ListOptions{Limit: 500, Continue: cont})
+		if err != nil {
+			rlog.Error("dynamic no-cache list failed", err, rlog.Any("gvr", c.resource.String()))
+			time.Sleep(*backoff)
+			*backoff = increaseBackoff(*backoff)
+			return "", false
+		}
+		*backoff = time.Second
+
+		for i := range list.Items {
+			obj := &list.Items[i]
+			addResource(obj)
+		}
+
+		resourceVersion = list.GetResourceVersion()
+		cont = list.GetContinue()
+		if cont == "" {
+			maybeForceGCAfterInitialList(c.resource.String())
+			return resourceVersion, true
+		}
+	}
+}
+
+func (c *DynamicController) noCacheWatch(stop <-chan struct{}, resourceVersion string, backoff *time.Duration) (string, bool) {
+	w, err := c.client.Resource(c.resource).Watch(context.Background(), metav1.ListOptions{ResourceVersion: resourceVersion, AllowWatchBookmarks: true})
+	if err != nil {
+		rlog.Error("dynamic no-cache watch failed", err, rlog.Any("gvr", c.resource.String()))
+		time.Sleep(*backoff)
+		*backoff = increaseBackoff(*backoff)
+		return resourceVersion, false
+	}
+	*backoff = time.Second
+
+	for {
+		select {
+		case <-stop:
+			w.Stop()
+			return resourceVersion, false
+		case evt, ok := <-w.ResultChan():
+			if !ok {
+				w.Stop()
+				// restart watch loop
+				return resourceVersion, false
+			}
+
+			u, ok := evt.Object.(*unstructured.Unstructured)
+			if !ok || u == nil {
+				// Ignore Status/error objects here; reconnect on Error events below
+				if evt.Type == "ERROR" {
+					w.Stop()
+					return "", true
+				}
+				continue
+			}
+
+			if rv := u.GetResourceVersion(); rv != "" {
+				resourceVersion = rv
+			}
+
+			switch evt.Type {
+			case "ADDED":
+				addResource(u)
+			case "MODIFIED":
+				updateResource(nil, u)
+			case "DELETED":
+				deleteResource(u)
+			case "BOOKMARK":
+				// only updates resourceVersion
+			case "ERROR":
+				w.Stop()
+				return "", true
+			}
+		}
 	}
 }
 

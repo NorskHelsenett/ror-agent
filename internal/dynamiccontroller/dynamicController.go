@@ -47,7 +47,7 @@ func NewDynamicController(client dynamic.Interface, resource schema.GroupVersion
 	dynWatcher.noCache = dynamicWatchNoCacheEnabled()
 
 	if dynWatcher.noCache {
-		rlog.Info("dynamic watch no-cache enabled", rlog.Any("env", config.DynamicWatchNoCacheEnv), rlog.Any("gvr", resource.String()))
+		rlog.Info("dynamic watcher enabled", rlog.Any("gvr", resource.String()), rlog.Any("noCache", dynWatcher.noCache))
 		return dynWatcher
 	}
 

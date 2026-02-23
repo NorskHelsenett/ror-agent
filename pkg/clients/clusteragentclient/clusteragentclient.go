@@ -121,7 +121,7 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		Subject: aclmodels.Acl2Subject(selfdata.ClusterId),
 	})
 	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.ClusterId)
-	rorhealth.Register(context.TODO(), "rorAPI", rorClient.rorAPIClient)
+	rorhealth.Register(context.TODO(), "rorAPI", client.rorAPIClient)
 
 	return client, nil
 }

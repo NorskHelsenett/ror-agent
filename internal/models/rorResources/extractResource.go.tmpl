@@ -7,12 +7,11 @@ import (
 	apiresourcecontracts "github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 )
 
-// the function determines which model to match the resource to and call prepareResourcePayload to cast the input to the matching model.
-func (rj rorResourceJson) getResource(resourceReturn *rorResource) error {
-	bytes := []byte(rj)
+// the function determines which model to match the resource to and call prepareResourcePayloadFromObject to cast the input to the matching model.
+func getResourceFromObject(resourceReturn *rorResource, obj map[string]any) error {
 {{ range .}}
     if resourceReturn.ApiVersion == "{{.GetApiVersion}}" && resourceReturn.Kind == "{{.Kind}}" {
-        payload, err := prepareResourcePayload[apiresourcecontracts.Resource{{.Kind}}](bytes)
+        payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.Resource{{.Kind}}](obj)
         resourceReturn.Resource = payload
         return err
     }

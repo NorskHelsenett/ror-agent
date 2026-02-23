@@ -1,10 +1,9 @@
 module github.com/NorskHelsenett/ror-agent
 
-go 1.25.6
+go 1.26.0
 
 require (
 	github.com/NorskHelsenett/ror v1.13.4
-	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-resty/resty/v2 v2.17.1
 	github.com/google/go-cmp v0.7.0
@@ -15,7 +14,6 @@ require (
 	k8s.io/client-go v0.35.0
 	k8s.io/metrics v0.35.0
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
-	sigs.k8s.io/controller-runtime v0.23.1
 )
 
 require (
@@ -122,6 +120,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect
+	sigs.k8s.io/controller-runtime v0.23.1 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect

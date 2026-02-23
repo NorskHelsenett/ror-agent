@@ -22,7 +22,7 @@ func SendResource(action apiresourcecontracts.ResourceAction, input *unstructure
 		if ResourceCache.CleanupRunning() {
 			ResourceCache.MarkActive(resourceReturn.Uid)
 		}
-		needUpdate := ResourceCache.HashList.checkUpdateNeeded(resourceReturn.Uid, resourceReturn.Hash)
+		needUpdate := ResourceCache.HashList.CheckUpdateNeeded(resourceReturn.Uid, resourceReturn.Hash)
 		if needUpdate {
 			err = sendResourceUpdateToRor(resourceReturn)
 			if err != nil {
@@ -30,7 +30,7 @@ func SendResource(action apiresourcecontracts.ResourceAction, input *unstructure
 				ResourceCache.Workqueue.Add(resourceReturn)
 				return
 			}
-			ResourceCache.HashList.updateHash(resourceReturn.Uid, resourceReturn.Hash)
+			ResourceCache.HashList.UpdateHash(resourceReturn.Uid, resourceReturn.Hash)
 		}
 	} else if action == apiresourcecontracts.K8sActionDelete {
 		err := sendResourceUpdateToRor(resourceReturn)

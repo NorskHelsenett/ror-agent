@@ -1,11 +1,21 @@
 package controllers
 
 import (
+	"context"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -13,23 +23,43 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const dynamicWatchNoCacheEnv = "ROR_DYNAMIC_WATCH_NO_CACHE"
+const forceGCAfterInitialListEnv = "ROR_FORCE_GC_AFTER_INITIAL_LIST"
+const forceGCAfterInitialListFreeOSMemoryEnv = "ROR_FORCE_GC_AFTER_INITIAL_LIST_FREE_OS_MEMORY"
+const forceGCAfterInitialListMinIntervalSecondsEnv = "ROR_FORCE_GC_AFTER_INITIAL_LIST_MIN_INTERVAL_SECONDS"
+
+var lastForcedGCAfterInitialListUnixNano int64
+
 type DynamicController struct {
 	dynInformer cache.SharedIndexInformer
 	client      dynamic.Interface
+	resource    schema.GroupVersionResource
+	noCache     bool
 }
 
 func (c *DynamicController) Run(stop <-chan struct{}) {
-	// Execute go function
+	if c.noCache {
+		go c.runNoCacheWatcher(stop)
+		return
+	}
 	go c.dynInformer.Run(stop)
 }
 
 // Function creates a new dynamic controller to listen for api-changes in provided GroupVersionResource
 func NewDynamicController(client dynamic.Interface, resource schema.GroupVersionResource) *DynamicController {
 	dynWatcher := &DynamicController{}
-	dynInformer := dynamicinformer.NewDynamicSharedInformerFactory(client, 0)
-	informer := dynInformer.ForResource(resource).Informer()
 
 	dynWatcher.client = client
+	dynWatcher.resource = resource
+	dynWatcher.noCache = dynamicWatchNoCacheEnabled()
+
+	if dynWatcher.noCache {
+		rlog.Info("dynamic watch no-cache enabled", rlog.Any("env", dynamicWatchNoCacheEnv), rlog.Any("gvr", resource.String()))
+		return dynWatcher
+	}
+
+	dynInformer := dynamicinformer.NewDynamicSharedInformerFactory(client, 0)
+	informer := dynInformer.ForResource(resource).Informer()
 	dynWatcher.dynInformer = informer
 
 	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -42,6 +72,195 @@ func NewDynamicController(client dynamic.Interface, resource schema.GroupVersion
 		rlog.Error("Error adding event handler", err)
 	}
 	return dynWatcher
+}
+
+func dynamicWatchNoCacheEnabled() bool {
+	val, ok := os.LookupEnv(dynamicWatchNoCacheEnv)
+	if !ok {
+		return false
+	}
+	val = strings.TrimSpace(strings.ToLower(val))
+	if val == "" {
+		return false
+	}
+	if b, err := strconv.ParseBool(val); err == nil {
+		return b
+	}
+	return val == "1" || val == "yes" || val == "y" || val == "on" || val == "enable" || val == "enabled"
+}
+
+func forceGCAfterInitialListEnabled() bool {
+	val, ok := os.LookupEnv(forceGCAfterInitialListEnv)
+	if !ok {
+		return false
+	}
+	val = strings.TrimSpace(strings.ToLower(val))
+	if val == "" {
+		return false
+	}
+	if b, err := strconv.ParseBool(val); err == nil {
+		return b
+	}
+	return val == "1" || val == "yes" || val == "y" || val == "on" || val == "enable" || val == "enabled"
+}
+
+func forceGCAfterInitialListFreeOSMemoryEnabled() bool {
+	val, ok := os.LookupEnv(forceGCAfterInitialListFreeOSMemoryEnv)
+	if !ok {
+		return false
+	}
+	val = strings.TrimSpace(strings.ToLower(val))
+	if val == "" {
+		return false
+	}
+	if b, err := strconv.ParseBool(val); err == nil {
+		return b
+	}
+	return val == "1" || val == "yes" || val == "y" || val == "on" || val == "enable" || val == "enabled"
+}
+
+func maybeForceGCAfterInitialList(gvr string) {
+	if !forceGCAfterInitialListEnabled() {
+		return
+	}
+
+	// Throttle: at most one forced GC across all controllers per interval.
+	// Without this, startup can trigger dozens of forced GCs (one per GVR), which is noisy and expensive.
+	minInterval := 30 * time.Second
+	if v, ok := os.LookupEnv(forceGCAfterInitialListMinIntervalSecondsEnv); ok {
+		if seconds, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && seconds >= 0 {
+			minInterval = time.Duration(seconds) * time.Second
+		}
+	}
+	now := time.Now().UnixNano()
+	for {
+		prev := atomic.LoadInt64(&lastForcedGCAfterInitialListUnixNano)
+		if prev != 0 && time.Duration(now-prev) < minInterval {
+			return
+		}
+		if atomic.CompareAndSwapInt64(&lastForcedGCAfterInitialListUnixNano, prev, now) {
+			break
+		}
+	}
+
+	rlog.Info("forcing GC after initial no-cache list", rlog.Any("env", forceGCAfterInitialListEnv), rlog.Any("gvr", gvr), rlog.Any("min_interval", minInterval.String()))
+	runtime.GC()
+	if forceGCAfterInitialListFreeOSMemoryEnabled() {
+		// Attempts to return as much memory as possible to the OS.
+		debug.FreeOSMemory()
+	}
+}
+
+func (c *DynamicController) runNoCacheWatcher(stop <-chan struct{}) {
+	// Paged LIST + WATCH loop without informer store.
+	// This keeps memory bounded compared to informers that retain full objects.
+	backoff := time.Second
+	resourceVersion := ""
+
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+		}
+
+		if resourceVersion == "" {
+			// Initial list (paged)
+			cont := ""
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+
+				list, err := c.client.Resource(c.resource).List(context.Background(), metav1.ListOptions{Limit: 500, Continue: cont})
+				if err != nil {
+					rlog.Error("dynamic no-cache list failed", err, rlog.Any("gvr", c.resource.String()))
+					time.Sleep(backoff)
+					if backoff < 30*time.Second {
+						backoff *= 2
+					}
+					break
+				}
+				backoff = time.Second
+
+				for i := range list.Items {
+					obj := &list.Items[i]
+					addResource(obj)
+				}
+
+				resourceVersion = list.GetResourceVersion()
+				cont = list.GetContinue()
+				if cont == "" {
+					maybeForceGCAfterInitialList(c.resource.String())
+					break
+				}
+			}
+			if resourceVersion == "" {
+				// list failed; retry outer loop
+				continue
+			}
+		}
+
+		w, err := c.client.Resource(c.resource).Watch(context.Background(), metav1.ListOptions{ResourceVersion: resourceVersion, AllowWatchBookmarks: true})
+		if err != nil {
+			rlog.Error("dynamic no-cache watch failed", err, rlog.Any("gvr", c.resource.String()))
+			time.Sleep(backoff)
+			if backoff < 30*time.Second {
+				backoff *= 2
+			}
+			continue
+		}
+		backoff = time.Second
+
+		for {
+			select {
+			case <-stop:
+				w.Stop()
+				return
+			case evt, ok := <-w.ResultChan():
+				if !ok {
+					w.Stop()
+					// restart watch loop
+					goto restart
+				}
+
+				u, ok := evt.Object.(*unstructured.Unstructured)
+				if !ok || u == nil {
+					// Ignore Status/error objects here; reconnect on Error events below
+					if evt.Type == "ERROR" {
+						w.Stop()
+						resourceVersion = "" // force re-list
+						goto restart
+					}
+					continue
+				}
+
+				if rv := u.GetResourceVersion(); rv != "" {
+					resourceVersion = rv
+				}
+
+				switch evt.Type {
+				case "ADDED":
+					addResource(u)
+				case "MODIFIED":
+					updateResource(nil, u)
+				case "DELETED":
+					deleteResource(u)
+				case "BOOKMARK":
+					// only updates resourceVersion
+				case "ERROR":
+					w.Stop()
+					resourceVersion = "" // force re-list
+					goto restart
+				}
+			}
+		}
+
+	restart:
+		continue
+	}
 }
 
 func addResource(obj any) {

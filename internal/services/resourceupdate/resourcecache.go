@@ -2,12 +2,15 @@ package resourceupdate
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 
+	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache/resourcecachehashlist"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	"github.com/NorskHelsenett/ror/pkg/helpers/stringhelper"
@@ -18,18 +21,30 @@ import (
 var ResourceCache resourcecache
 
 type resourcecache struct {
-	HashList       hashList
-	Workqueue      ResourceCacheWorkqueue
-	cleanupRunning bool
-	scheduler      *gocron.Scheduler
+	client                  clusteragentclient.RorAgentClientInterface
+	HashList                resourcecachehashlist.HashList
+	Workqueue               ResourceCacheWorkqueue
+	cleanupRunning          bool
+	scheduler               *gocron.Scheduler
+	memLogLastEstimateBytes uint64
 }
 
-func (rc *resourcecache) Init() error {
+func (rc *resourcecache) Init(client clusteragentclient.RorAgentClientInterface) error {
 	var err error
-	rc.HashList, err = getResourceHashList()
+	if client == nil {
+		rc.client, err = clusteragentclient.NewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
+		if err != nil {
+			return err
+		}
+	} else {
+		rc.client = client
+	}
+	rc.HashList, err = rc.client.GetRorClient().V1().Resources().GetHashList(rc.client.GetRorClient().GetOwnerref())
 	if err != nil {
 		return err
 	}
+	rlog.Info("got hashList from ror-api", rlog.Int("length", len(rc.HashList.Items)))
+
 	rc.scheduler = gocron.NewScheduler(time.Local)
 	rc.scheduler.StartAsync()
 	rc.addWorkqueScheduler(10)
@@ -41,7 +56,7 @@ func (rc resourcecache) CleanupRunning() bool {
 	return rc.cleanupRunning
 }
 func (rc *resourcecache) MarkActive(uid string) {
-	rc.HashList.markActive(uid)
+	rc.HashList.MarkActive(uid)
 }
 
 func (rc resourcecache) addWorkqueScheduler(seconds int) {
@@ -56,7 +71,13 @@ func (rc resourcecache) runWorkqueScheduler() {
 
 func (rc *resourcecache) startCleanup() {
 	rc.cleanupRunning = true
-	_, _ = rc.scheduler.Every(1).Day().At(time.Now().Add(time.Minute * 1)).Tag("resourcescleanup").Do(rc.finnishCleanup)
+	runAt := time.Now().Add(1 * time.Minute)
+	_, err := rc.scheduler.Every(1).Day().At(runAt.Format("15:04:05")).LimitRunsTo(1).Tag("resourcescleanup").Do(rc.finnishCleanup)
+	if err != nil {
+		rlog.Error("failed scheduling resource cleanup", err, rlog.Any("tag", "resourcescleanup"), rlog.Any("run_at", runAt))
+		return
+	}
+	rlog.Info("scheduled resource cleanup", rlog.Any("tag", "resourcescleanup"), rlog.Any("run_at", runAt))
 }
 
 func (rc *resourcecache) finnishCleanup() {
@@ -65,12 +86,14 @@ func (rc *resourcecache) finnishCleanup() {
 	}
 	rc.cleanupRunning = false
 	_ = rc.scheduler.RemoveByTag("resourcescleanup")
-	inactive := rc.HashList.getInactiveUid()
+	inactive := rc.HashList.GetInactiveUid()
+	rlog.Info("resource cleanup running", rlog.Int("inactive_count", len(inactive)))
 	if len(inactive) == 0 {
+		runtime.GC()
 		return
 	}
 	for _, uid := range inactive {
-		rlog.Info(fmt.Sprintf("Removing resource %s", uid))
+		rlog.Debug(fmt.Sprintf("Removing resource %s", uid))
 		resource := apiresourcecontracts.ResourceUpdateModel{
 			Owner:  authservice.CreateOwnerref(),
 			Uid:    uid,
@@ -79,6 +102,7 @@ func (rc *resourcecache) finnishCleanup() {
 		_ = sendResourceUpdateToRor(&resource)
 	}
 	rlog.Info(fmt.Sprintf("resource cleanup done, %d resources removed", len(inactive)))
+	runtime.GC()
 }
 
 func (rc resourcecache) PrettyPrintHashes() {
@@ -96,6 +120,6 @@ func (rc *resourcecache) RunWorkQue() {
 			return
 		}
 		rc.Workqueue.DeleteByUid(resourceReturn.ResourceUpdate.Uid)
-		rc.HashList.updateHash(resourceReturn.ResourceUpdate.Uid, resourceReturn.ResourceUpdate.Hash)
+		rc.HashList.UpdateHash(resourceReturn.ResourceUpdate.Uid, resourceReturn.ResourceUpdate.Hash)
 	}
 }

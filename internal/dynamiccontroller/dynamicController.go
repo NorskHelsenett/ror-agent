@@ -4,7 +4,6 @@ import (
 	"context"
 	"runtime"
 	"runtime/debug"
-	"sync/atomic"
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/internal/config"
@@ -84,26 +83,7 @@ func maybeForceGCAfterInitialList(gvr string) {
 	if !forceGCAfterInitialListEnabled() {
 		return
 	}
-
-	// Throttle: at most one forced GC across all controllers per interval.
-	// Without this, startup can trigger dozens of forced GCs (one per GVR), which is noisy and expensive.
-	minInterval := 30 * time.Second
-
-	if v := rorconfig.GetInt(config.ForceGCAfterInitialListMinIntervalSecondsEnv); v >= 0 {
-		minInterval = time.Duration(v) * time.Second
-	}
-	now := time.Now().UnixNano()
-	for {
-		prev := atomic.LoadInt64(&lastForcedGCAfterInitialListUnixNano)
-		if prev != 0 && time.Duration(now-prev) < minInterval {
-			return
-		}
-		if atomic.CompareAndSwapInt64(&lastForcedGCAfterInitialListUnixNano, prev, now) {
-			break
-		}
-	}
-
-	rlog.Info("forcing GC after initial no-cache list", rlog.Any("env", config.ForceGCAfterInitialListEnv), rlog.Any("gvr", gvr), rlog.Any("min_interval", minInterval.String()))
+	rlog.Info("forcing GC after initial no-cache list", rlog.Any("env", config.ForceGCAfterInitialListEnv), rlog.Any("gvr", gvr))
 	runtime.GC()
 	if forceGCAfterInitialListFreeOSMemoryEnabled() {
 		// Attempts to return as much memory as possible to the OS.

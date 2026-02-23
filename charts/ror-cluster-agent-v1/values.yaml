@@ -4,12 +4,10 @@ api: https://api.ror.nhn.no
 secretname: ror-secret
 
 agent:
-  memoryLimit: "200Mi"
+  memoryLimit: "200MiB"
   noCache: "true"
-  forceGCAfterInitialList: "false"
+  forceGCAfterInitialList: "true"
   forceGCAfterInitialListFreeOSMemory: "false"
-  forceGCAfterInitialListMinIntervalSeconds: "2"
-
 image:
   repository: ghcr.io/norskhelsenett/ror-cluster-agent
   pullPolicy: Always
@@ -42,7 +40,7 @@ securityContext:
 resources:
   limits:
     cpu: 1000m
-    memory: 256Mi
+    memory: 512Mi
   requests:
     cpu: 100m
     memory: 128Mi

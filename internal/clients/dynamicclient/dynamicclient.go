@@ -1,4 +1,4 @@
-package clients
+package dynamicclient
 
 import (
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rordefs"

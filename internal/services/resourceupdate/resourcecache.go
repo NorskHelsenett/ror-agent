@@ -99,7 +99,7 @@ func (rc *resourcecache) finnishCleanup() {
 			Uid:    uid,
 			Action: apiresourcecontracts.K8sActionDelete,
 		}
-		_ = sendResourceUpdateToRor(&resource)
+		_ = rc.sendResourceUpdateToRor(&resource)
 	}
 	rlog.Info(fmt.Sprintf("resource cleanup done, %d resources removed", len(inactive)))
 	runtime.GC()
@@ -113,7 +113,7 @@ func (rc resourcecache) PrettyPrintHashes() {
 // Resources in the que wil be requed using the sendResourceUpdateToRor function.
 func (rc *resourcecache) RunWorkQue() {
 	for _, resourceReturn := range rc.Workqueue {
-		err := sendResourceUpdateToRor(resourceReturn.ResourceUpdate)
+		err := rc.sendResourceUpdateToRor(resourceReturn.ResourceUpdate)
 		if err != nil {
 			rlog.Error("error re-sending resource update to ror, added to retryque", err)
 			rc.Workqueue.Add(resourceReturn.ResourceUpdate)
@@ -122,4 +122,26 @@ func (rc *resourcecache) RunWorkQue() {
 		rc.Workqueue.DeleteByUid(resourceReturn.ResourceUpdate.Uid)
 		rc.HashList.UpdateHash(resourceReturn.ResourceUpdate.Uid, resourceReturn.ResourceUpdate.Hash)
 	}
+}
+
+// the function sends the resource to the ror api. If receiving a non 2xx statuscode it will retun an error.
+func (rc *resourcecache) sendResourceUpdateToRor(resourceUpdate *apiresourcecontracts.ResourceUpdateModel) error {
+	rorClient := rc.client.GetRorClient()
+	var err error
+
+	switch resourceUpdate.Action {
+	case apiresourcecontracts.K8sActionUpdate:
+		err = rorClient.V1().Resources().Update(resourceUpdate)
+	case apiresourcecontracts.K8sActionAdd:
+		err = rorClient.V1().Resources().Create(resourceUpdate)
+	case apiresourcecontracts.K8sActionDelete:
+		err = rorClient.V1().Resources().Delete(resourceUpdate.Uid)
+	default:
+		rlog.Error("Not implemented", nil)
+
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -1,7 +1,7 @@
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/NorskHelsenett/ror v1.14.1 h1:KvaIpycohjvn/7pSc0kTI95wcs6Ug7CxjsZ2Jus8kzA=
-github.com/NorskHelsenett/ror v1.14.1/go.mod h1:IG7tZZ2ZXoYoFxtbGg6Blw9n/C4qvy7yZjBwt8ataU0=
+github.com/NorskHelsenett/ror v1.14.2 h1:shIm+Fbr6ohkB0Y/Iz01Oi47NMRjGXNmm/jFSMhlUpo=
+github.com/NorskHelsenett/ror v1.14.2/go.mod h1:IG7tZZ2ZXoYoFxtbGg6Blw9n/C4qvy7yZjBwt8ataU0=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=

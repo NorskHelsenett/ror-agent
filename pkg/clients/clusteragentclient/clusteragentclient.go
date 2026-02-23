@@ -15,6 +15,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/idhelper"
+	"github.com/NorskHelsenett/ror/pkg/helpers/rorhealth"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v2"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v2"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
@@ -98,11 +99,11 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		return nil, err
 	}
 
-	// err = client.initAuthorizedRorClient()
-	// if err != nil {
-	// 	rlog.Error("failed to setup RorClient", err)
-	// 	return nil, err
-	// }
+	err = client.initAuthorizedRorClient()
+	if err != nil {
+		rlog.Error("failed to setup RorClient", err)
+		return nil, err
+	}
 
 	ver, err := client.rorAPIClient.Info().GetVersion(context.TODO())
 	if err != nil {
@@ -120,6 +121,7 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		Subject: aclmodels.Acl2Subject(selfdata.ClusterId),
 	})
 	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.ClusterId)
+	rorhealth.Register(context.TODO(), "rorAPI", client.rorAPIClient)
 
 	return client, nil
 }
@@ -238,8 +240,6 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 		}
 	}
 
-	r.config.apiKey = UNKNOWN_API_KEY
-	// TODO: use v2 og clusters/register endpoint to register cluster if cluster id is unknown
 	if r.config.apiKey == UNKNOWN_API_KEY {
 		rlog.Info("api key secret not found, registering new key")
 

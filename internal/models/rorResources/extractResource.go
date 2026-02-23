@@ -4,147 +4,147 @@ package rorResources
 
 import (
 	"fmt"
+
 	apiresourcecontracts "github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 )
 
-// the function determines which model to match the resource to and call prepareResourcePayload to cast the input to the matching model.
-func (rj rorResourceJson) getResource(resourceReturn *rorResource) error {
-	bytes := []byte(rj)
+// the function determines which model to match the resource to and call prepareResourcePayloadFromObject to cast the input to the matching model.
+func getResourceFromObject(resourceReturn *rorResource, obj map[string]any) error {
 
 	if resourceReturn.ApiVersion == "v1" && resourceReturn.Kind == "Namespace" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceNamespace](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceNamespace](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "v1" && resourceReturn.Kind == "Node" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceNode](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceNode](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "v1" && resourceReturn.Kind == "PersistentVolumeClaim" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourcePersistentVolumeClaim](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourcePersistentVolumeClaim](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "apps/v1" && resourceReturn.Kind == "Deployment" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceDeployment](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceDeployment](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "storage.k8s.io/v1" && resourceReturn.Kind == "StorageClass" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceStorageClass](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceStorageClass](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "wgpolicyk8s.io/v1alpha2" && resourceReturn.Kind == "PolicyReport" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourcePolicyReport](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourcePolicyReport](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "argoproj.io/v1alpha1" && resourceReturn.Kind == "Application" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceApplication](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceApplication](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "argoproj.io/v1alpha1" && resourceReturn.Kind == "AppProject" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceAppProject](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceAppProject](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "cert-manager.io/v1" && resourceReturn.Kind == "Certificate" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceCertificate](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceCertificate](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "v1" && resourceReturn.Kind == "Service" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceService](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceService](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "v1" && resourceReturn.Kind == "Pod" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourcePod](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourcePod](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "apps/v1" && resourceReturn.Kind == "ReplicaSet" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceReplicaSet](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceReplicaSet](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "apps/v1" && resourceReturn.Kind == "StatefulSet" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceStatefulSet](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceStatefulSet](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "apps/v1" && resourceReturn.Kind == "DaemonSet" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceDaemonSet](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceDaemonSet](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "networking.k8s.io/v1" && resourceReturn.Kind == "Ingress" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceIngress](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceIngress](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "networking.k8s.io/v1" && resourceReturn.Kind == "IngressClass" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceIngressClass](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceIngressClass](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "aquasecurity.github.io/v1alpha1" && resourceReturn.Kind == "VulnerabilityReport" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceVulnerabilityReport](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceVulnerabilityReport](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "aquasecurity.github.io/v1alpha1" && resourceReturn.Kind == "ExposedSecretReport" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceExposedSecretReport](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceExposedSecretReport](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "aquasecurity.github.io/v1alpha1" && resourceReturn.Kind == "ConfigAuditReport" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceConfigAuditReport](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceConfigAuditReport](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "aquasecurity.github.io/v1alpha1" && resourceReturn.Kind == "RbacAssessmentReport" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceRbacAssessmentReport](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceRbacAssessmentReport](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "aquasecurity.github.io/v1alpha1" && resourceReturn.Kind == "ClusterComplianceReport" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceClusterComplianceReport](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceClusterComplianceReport](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "v1" && resourceReturn.Kind == "Endpoints" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceEndpoints](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceEndpoints](obj)
 		resourceReturn.Resource = payload
 		return err
 	}
 
 	if resourceReturn.ApiVersion == "networking.k8s.io/v1" && resourceReturn.Kind == "NetworkPolicy" {
-		payload, err := prepareResourcePayload[apiresourcecontracts.ResourceNetworkPolicy](bytes)
+		payload, err := prepareResourcePayloadFromObject[apiresourcecontracts.ResourceNetworkPolicy](obj)
 		resourceReturn.Resource = payload
 		return err
 	}

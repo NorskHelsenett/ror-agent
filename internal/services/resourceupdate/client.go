@@ -1,11 +1,8 @@
 package resourceupdate
 
 import (
-	"encoding/json"
-
 	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
-	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 
@@ -71,56 +68,4 @@ func sendResourceUpdateToRor(resourceUpdate *apiresourcecontracts.ResourceUpdate
 		rlog.Debug("partial update sent to ror", rlog.String("api verson", resourceUpdate.ApiVersion), rlog.String("kind", resourceUpdate.Kind), rlog.String("uid", resourceUpdate.Uid))
 	}
 	return nil
-}
-
-// function to get the persisted list of hashes from the api. The function is called on startup to populate the internal hashlist.
-// The function makes the agent able to catch up on changes that has happened when its offline exluding deletes.
-// TODO: Create a check to remove objects that are deleted during downtime of the agent.
-func getResourceHashList() (hashList, error) {
-	var hashlist hashList
-
-	rorClient, err := clients.GetOrCreateRorClient()
-	if err != nil {
-		config.IncreaseErrorCount()
-		rlog.Error("could not get ror-api client", err,
-			rlog.Int("error count", config.ErrorCount))
-		return hashlist, err
-	}
-	url := "/v1/resources/hashes"
-
-	ownerref := authservice.CreateOwnerref()
-
-	response, err := rorClient.R().
-		SetQueryParams(ownerref.GetQueryParams()).
-		SetHeader("Content-Type", "application/json").
-		Get(url)
-
-	if err != nil {
-		config.IncreaseErrorCount()
-		rlog.Error("could not send data to ror-api", err,
-			rlog.Int("error count", config.ErrorCount))
-		return hashlist, err
-	}
-
-	if response == nil {
-		config.IncreaseErrorCount()
-		rlog.Error("response is nil", err,
-			rlog.Int("error count", config.ErrorCount))
-		return hashlist, err
-	}
-
-	if !response.IsSuccess() {
-		config.IncreaseErrorCount()
-		rlog.Info("got non 200 statuscode from ror-api", rlog.Int("status code", response.StatusCode()),
-			rlog.Int("error count", config.ErrorCount))
-		return hashlist, err
-	} else {
-		config.ResetErrorCount()
-		err = json.Unmarshal(response.Body(), &hashlist)
-		if err != nil {
-			rlog.Error("could not unmarshal reply", err)
-		}
-		rlog.Info("got hashList from ror-api, length:", rlog.Int("length", len(hashlist.Items)))
-	}
-	return hashlist, nil
 }

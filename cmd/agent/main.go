@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
+	"github.com/NorskHelsenett/ror-agent/internal/clients/dynamicclient"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror-agent/internal/dynamiccontroller"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
@@ -71,7 +71,7 @@ func main() {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 
-	schemas := clients.InitSchema()
+	schemas := dynamicclient.InitSchema()
 
 	for _, schema := range schemas {
 		check, err := discovery.IsResourceEnabled(discoveryClient, schema)

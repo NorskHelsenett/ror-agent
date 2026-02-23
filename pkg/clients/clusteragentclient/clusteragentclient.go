@@ -14,6 +14,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
+	"github.com/NorskHelsenett/ror/pkg/helpers/rorhealth"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v2"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v2"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
@@ -122,6 +123,7 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		Subject: aclmodels.Acl2Subject(selfdata.ClusterId),
 	})
 	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.ClusterId)
+	rorhealth.Register(context.TODO(), "rorAPI", rorClient.rorAPIClient)
 
 	return rorClient, nil
 }

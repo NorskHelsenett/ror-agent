@@ -20,6 +20,8 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
+	healthserver "github.com/NorskHelsenett/ror/pkg/helpers/rorhealth/server"
+
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	"syscall"
@@ -93,6 +95,13 @@ func main() {
 	}
 
 	scheduler.SetUpScheduler(rorClientInterface)
+
+	rlog.Info("Initializing health server")
+	err = healthserver.Start(healthserver.ServerString(rorconfig.GetString(configconsts.HEALTH_ENDPOINT)))
+
+	if err != nil {
+		rlog.Fatal("could not start health server", err)
+	}
 
 	<-stop
 	rlog.Info("Shutting down...")

@@ -99,11 +99,11 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		return nil, err
 	}
 
-	// err = client.initAuthorizedRorClient()
-	// if err != nil {
-	// 	rlog.Error("failed to setup RorClient", err)
-	// 	return nil, err
-	// }
+	err = client.initAuthorizedRorClient()
+	if err != nil {
+		rlog.Error("failed to setup RorClient", err)
+		return nil, err
+	}
 
 	ver, err := client.rorAPIClient.Info().GetVersion(context.TODO())
 	if err != nil {
@@ -157,24 +157,6 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 	if err != nil {
 		return fmt.Errorf("Could not get cluster auth from secret: %s", err)
 	}
-
-	// check if api endpoint is accessible
-
-	// err = client.initAuthorizedRorClient()
-	// if err != nil {
-	// 	rlog.Error("failed to setup RorClient", err)
-	// 	return nil, err
-	// }
-
-	// ver, err := client.rorAPIClient.Info().GetVersion(context.TODO())
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// selfdata, err := client.rorAPIClient.Clusters().GetSelf()
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	//Check if we know the cluster id
 
@@ -240,8 +222,6 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 		}
 	}
 
-	r.config.apiKey = UNKNOWN_API_KEY
-	// TODO: use v2 og clusters/register endpoint to register cluster if cluster id is unknown
 	if r.config.apiKey == UNKNOWN_API_KEY {
 		rlog.Info("api key secret not found, registering new key")
 

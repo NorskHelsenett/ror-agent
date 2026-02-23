@@ -3,9 +3,8 @@ module github.com/NorskHelsenett/ror-agent
 go 1.26.0
 
 require (
-	github.com/NorskHelsenett/ror v1.14.1
+	github.com/NorskHelsenett/ror v1.14.3
 	github.com/go-co-op/gocron v1.37.0
-	github.com/go-resty/resty/v2 v2.17.1
 	github.com/google/go-cmp v0.7.0
 	github.com/stretchr/testify v1.11.1
 	gopkg.in/yaml.v3 v3.0.1

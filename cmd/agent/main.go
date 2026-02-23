@@ -7,9 +7,9 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
+	"github.com/NorskHelsenett/ror-agent/internal/clients/dynamicclient"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
-	"github.com/NorskHelsenett/ror-agent/internal/controllers"
+	"github.com/NorskHelsenett/ror-agent/internal/dynamiccontroller"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
@@ -19,6 +19,8 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
+
+	healthserver "github.com/NorskHelsenett/ror/pkg/helpers/rorhealth/server"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
@@ -69,7 +71,7 @@ func main() {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 
-	schemas := clients.InitSchema()
+	schemas := dynamicclient.InitSchema()
 
 	for _, schema := range schemas {
 		check, err := discovery.IsResourceEnabled(discoveryClient, schema)
@@ -77,7 +79,7 @@ func main() {
 			rlog.Error("Could not query resources from cluster", err)
 		}
 		if check {
-			controller := controllers.NewDynamicController(dynamicClient, schema)
+			controller := dynamiccontroller.NewDynamicController(dynamicClient, schema)
 
 			go func() {
 				controller.Run(stop)
@@ -93,6 +95,13 @@ func main() {
 	}
 
 	scheduler.SetUpScheduler(rorClientInterface)
+
+	rlog.Info("Initializing health server")
+	err = healthserver.Start(healthserver.ServerString(rorconfig.GetString(configconsts.HEALTH_ENDPOINT)))
+
+	if err != nil {
+		rlog.Fatal("could not start health server", err)
+	}
 
 	<-stop
 	rlog.Info("Shutting down...")

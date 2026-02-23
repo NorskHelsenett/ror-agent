@@ -7,6 +7,12 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 )
 
+const (
+	DynamicWatchNoCacheEnv                 = "ROR_DYNAMIC_WATCH_NO_CACHE"
+	ForceGCAfterInitialListEnv             = "ROR_FORCE_GC_AFTER_INITIAL_LIST"
+	ForceGCAfterInitialListFreeOSMemoryEnv = "ROR_FORCE_GC_AFTER_INITIAL_LIST_FREE_OS_MEMORY"
+)
+
 var (
 	ErrorCount int
 )
@@ -14,13 +20,15 @@ var (
 func Init() {
 	rlog.InitializeRlog()
 	rlog.Info("Configuration initializing ...")
+	rorconfig.InitConfig()
 	rorconfig.SetDefault(configconsts.HEALTH_ENDPOINT, ":8100")
 	rorconfig.SetDefault(configconsts.POD_NAMESPACE, "ror")
 	rorconfig.SetDefault(configconsts.API_KEY_SECRET, "ror-apikey")
 	rorconfig.SetDefault(configconsts.ENABLE_PPROF, false)
-	rorconfig.SetDefault("ROR_DYNAMIC_WATCH_NO_CACHE", true)
-	rorconfig.SetDefault("ROR_FORCE_GC_AFTER_INITIAL_LIST", true)
-	rorconfig.SetDefault("ROR_FORCE_GC_AFTER_INITIAL_LIST_MIN_INTERVAL_SECONDS", 2)
+	rorconfig.SetDefault(DynamicWatchNoCacheEnv, true)
+	rorconfig.SetDefault(ForceGCAfterInitialListEnv, true)
+	rorconfig.SetDefault(configconsts.ROLE, "ror-agent")
+
 	rorconfig.AutomaticEnv()
 }
 

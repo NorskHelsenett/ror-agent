@@ -46,13 +46,13 @@ spec:
             - name: GOMEMLIMIT
               value: {{ .Values.agent.memoryLimit | default "200Mi" | quote }} 
             - name: ROR_DYNAMIC_WATCH_NO_CACHE
-              value: {{ .Values.agent.noCache | default "true" }}
+              value: {{ .Values.agent.noCache | default "true" | quote }}
             - name: "ROR_FORCE_GC_AFTER_INITIAL_LIST"
-              value: {{ .Values.agent.forceGCAfterInitialList | default "false" }}
+              value: {{ .Values.agent.forceGCAfterInitialList | default "false" | quote }}
             - name: "ROR_FORCE_GC_AFTER_INITIAL_LIST_FREE_OS_MEMORY"
-              value: {{ .Values.agent.forceGCAfterInitialListFreeOSMemory | default "false" }}
+              value: {{ .Values.agent.forceGCAfterInitialListFreeOSMemory | default "false" | quote }}
             - name: "ROR_FORCE_GC_AFTER_INITIAL_LIST_MIN_INTERVAL_SECONDS"
-              value: {{ .Values.agent.forceGCAfterInitialListMinIntervalSeconds | default "2" }}
+              value: {{ .Values.agent.forceGCAfterInitialListMinIntervalSeconds | default "2" | quote }}
           ports:
             - name: liveness-probe
               containerPort: 8100

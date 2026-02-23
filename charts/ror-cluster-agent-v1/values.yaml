@@ -4,7 +4,6 @@ api: https://api.ror.nhn.no
 secretname: ror-secret
 
 agent:
-
   memoryLimit: "200Mi"
   noCache: "true"
   forceGCAfterInitialList: "false"

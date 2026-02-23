@@ -21,8 +21,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var lastForcedGCAfterInitialListUnixNano int64
-
 type DynamicController struct {
 	dynInformer cache.SharedIndexInformer
 	client      dynamic.Interface

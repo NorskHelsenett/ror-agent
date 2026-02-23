@@ -9,7 +9,7 @@ import (
 
 	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
-	"github.com/NorskHelsenett/ror-agent/internal/controllers"
+	"github.com/NorskHelsenett/ror-agent/internal/dynamiccontroller"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
@@ -79,7 +79,7 @@ func main() {
 			rlog.Error("Could not query resources from cluster", err)
 		}
 		if check {
-			controller := controllers.NewDynamicController(dynamicClient, schema)
+			controller := dynamiccontroller.NewDynamicController(dynamicClient, schema)
 
 			go func() {
 				controller.Run(stop)

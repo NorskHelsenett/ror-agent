@@ -1,15 +1,13 @@
-package controllers
+package dynamiccontroller
 
 import (
 	"context"
-	"os"
 	"runtime"
 	"runtime/debug"
-	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
@@ -23,11 +21,6 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 )
-
-const dynamicWatchNoCacheEnv = "ROR_DYNAMIC_WATCH_NO_CACHE"
-const forceGCAfterInitialListEnv = "ROR_FORCE_GC_AFTER_INITIAL_LIST"
-const forceGCAfterInitialListFreeOSMemoryEnv = "ROR_FORCE_GC_AFTER_INITIAL_LIST_FREE_OS_MEMORY"
-const forceGCAfterInitialListMinIntervalSecondsEnv = "ROR_FORCE_GC_AFTER_INITIAL_LIST_MIN_INTERVAL_SECONDS"
 
 var lastForcedGCAfterInitialListUnixNano int64
 
@@ -55,7 +48,7 @@ func NewDynamicController(client dynamic.Interface, resource schema.GroupVersion
 	dynWatcher.noCache = dynamicWatchNoCacheEnabled()
 
 	if dynWatcher.noCache {
-		rlog.Info("dynamic watch no-cache enabled", rlog.Any("env", dynamicWatchNoCacheEnv), rlog.Any("gvr", resource.String()))
+		rlog.Info("dynamic watch no-cache enabled", rlog.Any("env", config.DynamicWatchNoCacheEnv), rlog.Any("gvr", resource.String()))
 		return dynWatcher
 	}
 
@@ -76,15 +69,15 @@ func NewDynamicController(client dynamic.Interface, resource schema.GroupVersion
 }
 
 func dynamicWatchNoCacheEnabled() bool {
-	return rorconfig.GetBool(dynamicWatchNoCacheEnv)
+	return rorconfig.GetBool(config.DynamicWatchNoCacheEnv)
 }
 
 func forceGCAfterInitialListEnabled() bool {
-	return rorconfig.GetBool(forceGCAfterInitialListEnv)
+	return rorconfig.GetBool(config.ForceGCAfterInitialListEnv)
 }
 
 func forceGCAfterInitialListFreeOSMemoryEnabled() bool {
-	return rorconfig.GetBool(forceGCAfterInitialListFreeOSMemoryEnv)
+	return rorconfig.GetBool(config.ForceGCAfterInitialListFreeOSMemoryEnv)
 }
 
 func maybeForceGCAfterInitialList(gvr string) {
@@ -95,10 +88,9 @@ func maybeForceGCAfterInitialList(gvr string) {
 	// Throttle: at most one forced GC across all controllers per interval.
 	// Without this, startup can trigger dozens of forced GCs (one per GVR), which is noisy and expensive.
 	minInterval := 30 * time.Second
-	if v, ok := os.LookupEnv(forceGCAfterInitialListMinIntervalSecondsEnv); ok {
-		if seconds, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && seconds >= 0 {
-			minInterval = time.Duration(seconds) * time.Second
-		}
+
+	if v := rorconfig.GetInt(config.ForceGCAfterInitialListMinIntervalSecondsEnv); v >= 0 {
+		minInterval = time.Duration(v) * time.Second
 	}
 	now := time.Now().UnixNano()
 	for {
@@ -111,7 +103,7 @@ func maybeForceGCAfterInitialList(gvr string) {
 		}
 	}
 
-	rlog.Info("forcing GC after initial no-cache list", rlog.Any("env", forceGCAfterInitialListEnv), rlog.Any("gvr", gvr), rlog.Any("min_interval", minInterval.String()))
+	rlog.Info("forcing GC after initial no-cache list", rlog.Any("env", config.ForceGCAfterInitialListEnv), rlog.Any("gvr", gvr), rlog.Any("min_interval", minInterval.String()))
 	runtime.GC()
 	if forceGCAfterInitialListFreeOSMemoryEnabled() {
 		// Attempts to return as much memory as possible to the OS.

@@ -13,6 +13,7 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,48 +76,15 @@ func NewDynamicController(client dynamic.Interface, resource schema.GroupVersion
 }
 
 func dynamicWatchNoCacheEnabled() bool {
-	val, ok := os.LookupEnv(dynamicWatchNoCacheEnv)
-	if !ok {
-		return false
-	}
-	val = strings.TrimSpace(strings.ToLower(val))
-	if val == "" {
-		return false
-	}
-	if b, err := strconv.ParseBool(val); err == nil {
-		return b
-	}
-	return val == "1" || val == "yes" || val == "y" || val == "on" || val == "enable" || val == "enabled"
+	return rorconfig.GetBool(dynamicWatchNoCacheEnv)
 }
 
 func forceGCAfterInitialListEnabled() bool {
-	val, ok := os.LookupEnv(forceGCAfterInitialListEnv)
-	if !ok {
-		return false
-	}
-	val = strings.TrimSpace(strings.ToLower(val))
-	if val == "" {
-		return false
-	}
-	if b, err := strconv.ParseBool(val); err == nil {
-		return b
-	}
-	return val == "1" || val == "yes" || val == "y" || val == "on" || val == "enable" || val == "enabled"
+	return rorconfig.GetBool(forceGCAfterInitialListEnv)
 }
 
 func forceGCAfterInitialListFreeOSMemoryEnabled() bool {
-	val, ok := os.LookupEnv(forceGCAfterInitialListFreeOSMemoryEnv)
-	if !ok {
-		return false
-	}
-	val = strings.TrimSpace(strings.ToLower(val))
-	if val == "" {
-		return false
-	}
-	if b, err := strconv.ParseBool(val); err == nil {
-		return b
-	}
-	return val == "1" || val == "yes" || val == "y" || val == "on" || val == "enable" || val == "enabled"
+	return rorconfig.GetBool(forceGCAfterInitialListFreeOSMemoryEnv)
 }
 
 func maybeForceGCAfterInitialList(gvr string) {

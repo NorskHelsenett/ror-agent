@@ -43,6 +43,16 @@ spec:
                   fieldPath: metadata.namespace
             - name: SECRET_NAME
               value: {{ .Values.secretname }}
+            - name: GOMEMLIMIT
+              value: {{ .Values.agent.memoryLimit | default "200Mi" | quote }} 
+            - name: ROR_DYNAMIC_WATCH_NO_CACHE
+              value: {{ .Values.agent.noCache | default "true" }}
+            - name: "ROR_FORCE_GC_AFTER_INITIAL_LIST"
+              value: {{ .Values.agent.forceGCAfterInitialList | default "false" }}
+            - name: "ROR_FORCE_GC_AFTER_INITIAL_LIST_FREE_OS_MEMORY"
+              value: {{ .Values.agent.forceGCAfterInitialListFreeOSMemory | default "false" }}
+            - name: "ROR_FORCE_GC_AFTER_INITIAL_LIST_MIN_INTERVAL_SECONDS"
+              value: {{ .Values.agent.forceGCAfterInitialListMinIntervalSeconds | default "2" }}
           ports:
             - name: liveness-probe
               containerPort: 8100

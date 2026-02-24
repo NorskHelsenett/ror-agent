@@ -1,21 +1,19 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 
 	"github.com/NorskHelsenett/ror-agent/internal/config"
-	"github.com/NorskHelsenett/ror-agent/internal/handlers/dynamichandler"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
-	"github.com/NorskHelsenett/ror-agent/pkg/controllers/dynamiccontroller"
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rordefs"
 
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror-agent/pkg/clients/dynamicclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
@@ -26,8 +24,6 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	"syscall"
-
-	"k8s.io/client-go/discovery"
 )
 
 func main() {
@@ -56,17 +52,6 @@ func main() {
 	if err != nil {
 		rlog.Fatal("could not get RorClientInterface", err)
 	}
-
-	discoveryClient, err := rorClientInterface.GetKubernetesClientset().GetDiscoveryClient()
-	if err != nil {
-		rlog.Error("failed to get discovery client", err)
-	}
-
-	dynamicClient, err := rorClientInterface.GetKubernetesClientset().GetDynamicClient()
-	if err != nil {
-		rlog.Error("failed to get dynamic client", err)
-	}
-
 	err = resourceupdate.ResourceCache.Init(rorClientInterface)
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
@@ -74,26 +59,7 @@ func main() {
 
 	schemas := rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent)
 
-	for _, schema := range schemas {
-		check, err := discovery.IsResourceEnabled(discoveryClient, schema)
-		if err != nil {
-			rlog.Error("Could not query resources from cluster", err)
-		}
-		if check {
-			controller := dynamiccontroller.NewDynamicController(dynamicClient, dynamichandler.GetHandlersForSchema(schema))
-
-			go func() {
-				controller.Run(stop)
-				sig := <-sigs
-				_, _ = fmt.Println()
-				_, _ = fmt.Println(sig)
-				stop <- struct{}{}
-			}()
-		} else {
-			errmsg := fmt.Sprintf("Could not register resource %s", schema.Resource)
-			rlog.Info(errmsg)
-		}
-	}
+	dynamicclient.Start(rorClientInterface, schemas, stop, sigs)
 
 	scheduler.SetUpScheduler(rorClientInterface)
 

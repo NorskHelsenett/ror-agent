@@ -7,7 +7,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 )
 
-func Start() {
+func MustStart() {
 	rlog.Info("Initializing health server")
 	err := healthserver.Start(healthserver.ServerString(rorconfig.GetString(configconsts.HEALTH_ENDPOINT)))
 

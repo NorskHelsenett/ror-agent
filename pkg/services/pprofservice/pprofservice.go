@@ -14,7 +14,7 @@ func MayStartPprof() {
 			rlog.Info("Starting pprof server on port 6060")
 			err := http.ListenAndServe("localhost:6060", nil)
 			if err != nil {
-				rlog.Fatal("could not start pprof server", err)
+				rlog.Error("could not start pprof server", err)
 			}
 		}()
 	}

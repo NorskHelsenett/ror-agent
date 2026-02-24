@@ -43,22 +43,22 @@ func (c *DynamicController) Run(stop <-chan struct{}) {
 type Resourcehandlers = cache.ResourceEventHandlerFuncs
 
 // Function creates a new dynamic controller to listen for api-changes in provided GroupVersionResource
-func NewDynamicController(client dynamic.Interface, handlers DynamicHandler) *DynamicController {
+func NewDynamicController(client dynamic.Interface, handler DynamicHandler) *DynamicController {
 	dynWatcher := &DynamicController{}
 
 	dynWatcher.client = client
-	dynWatcher.resource = handlers.GetSchema()
+	dynWatcher.resource = handler.GetSchema()
 	dynWatcher.noCache = dynamicWatchNoCacheEnabled()
+	dynWatcher.dynHandler = handler
 
 	if dynWatcher.noCache {
-		rlog.Info("dynamic watcher enabled", rlog.Any("gvr", handlers.GetSchema().String()), rlog.Any("noCache", dynWatcher.noCache))
+		rlog.Info("dynamic watcher enabled", rlog.Any("gvr", dynWatcher.dynHandler.GetSchema().String()), rlog.Any("noCache", dynWatcher.noCache))
 		return dynWatcher
 	}
 
 	dynInformer := dynamicinformer.NewDynamicSharedInformerFactory(client, 0)
-	informer := dynInformer.ForResource(handlers.GetSchema()).Informer()
+	informer := dynInformer.ForResource(dynWatcher.dynHandler.GetSchema()).Informer()
 	dynWatcher.dynInformer = informer
-	dynWatcher.dynHandler = handlers
 
 	_, err := informer.AddEventHandler(dynWatcher.dynHandler.GetHandlers())
 

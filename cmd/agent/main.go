@@ -1,9 +1,6 @@
 package main
 
 import (
-	"os"
-	"os/signal"
-
 	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
@@ -18,8 +15,6 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
-
-	"syscall"
 )
 
 func main() {
@@ -27,31 +22,20 @@ func main() {
 
 	pprofservice.MayStartPprof()
 
-	_ = "rebuild 6"
 	rlog.Info("Agent is starting", rlog.String("version", rorversion.GetRorVersion().GetVersion()))
-	sigs := make(chan os.Signal, 1)                                    // Create channel to receive os signals
-	stop := make(chan struct{})                                        // Create channel to receive stop signal
-	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT) // Register the sigs channel to receieve SIGTERM
 
-	go func() {
-		services.GetEgressIp()
-	}()
+	services.GetEgressIp()
 
-	rorClientInterface, err := clusteragentclient.NewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
-	if err != nil {
-		rlog.Fatal("could not get RorClientInterface", err)
-	}
-	err = resourceupdate.ResourceCache.Init(rorClientInterface)
-	if err != nil {
-		rlog.Fatal("could not get hashlist for clusterid", err)
-	}
+	rorClientInterface := clusteragentclient.MustInitNewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
 
-	dynamicclient.Start(rorClientInterface, rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent), stop, sigs)
+	resourceupdate.ResourceCache.MustInit(rorClientInterface)
 
-	scheduler.Start(rorClientInterface)
+	dynamicclient.MustStart(rorClientInterface, rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent))
 
-	healthservice.Start()
+	scheduler.MustStart(rorClientInterface)
 
-	<-stop
+	healthservice.MustStart()
+
+	<-rorClientInterface.GetStopChan()
 	rlog.Info("Shutting down...")
 }

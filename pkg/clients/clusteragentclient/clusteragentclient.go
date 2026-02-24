@@ -4,6 +4,9 @@ package clusteragentclient
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apikeystypes/v2"
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
@@ -38,6 +41,8 @@ const (
 type RorAgentClientInterface interface {
 	GetRorClient() rorclient.RorClientInterface
 	GetKubernetesClientset() *kubernetesclient.K8sClientsets
+	GetSigs() chan os.Signal
+	GetStopChan() chan struct{}
 
 	PingRorAPI() error
 }
@@ -56,6 +61,8 @@ type rorAgentClient struct {
 	rorAPIClient *rorclient.RorClient
 	k8sClientSet *kubernetesclient.K8sClientsets
 	config       RorAgentClientConfig
+	stopChan     chan struct{}
+	sigs         chan os.Signal
 }
 
 func GetDefaultRorAgentClientConfig() *RorAgentClientConfig {
@@ -73,6 +80,14 @@ func NewRorAgentClientWithDefaults() (RorAgentClientInterface, error) {
 	return NewRorAgentClient(GetDefaultRorAgentClientConfig())
 }
 
+func MustInitNewRorAgentClient(config *RorAgentClientConfig) RorAgentClientInterface {
+	client, err := NewRorAgentClient(config)
+	if err != nil {
+		rlog.Fatal("failed to initialize RorAgentClient", err)
+	}
+	return client
+}
+
 func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config cannot be nil, please use NewRorAgentClientWithDefaults if no custom config is needed")
@@ -85,7 +100,11 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 	client := &rorAgentClient{
 		config:       *config,
 		k8sClientSet: kubernetesclient.MustInitializeKubernetesClient(),
+		sigs:         make(chan os.Signal, 1),
+		stopChan:     make(chan struct{}),
 	}
+	// Create channel to receive stop signal
+	signal.Notify(client.sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT) // Register the sigs channel to receieve SIGTERM
 
 	err := client.initInterregator()
 	if err != nil {
@@ -416,4 +435,12 @@ func (c *RorAgentClientConfig) Validate() error {
 	}
 	return nil
 
+}
+
+func (r *rorAgentClient) GetSigs() chan os.Signal {
+	return r.sigs
+}
+
+func (r *rorAgentClient) GetStopChan() chan struct{} {
+	return r.stopChan
 }

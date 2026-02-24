@@ -9,7 +9,7 @@ import (
 	"github.com/go-co-op/gocron"
 )
 
-func Start(rorClientInterface clusteragentclient.RorAgentClientInterface) {
+func MustStart(rorClientInterface clusteragentclient.RorAgentClientInterface) {
 	scheduler := gocron.NewScheduler(time.UTC)
 	_, err := scheduler.Every(1).Minute().Tag("heartbeat").Do(HeartbeatReporting, rorClientInterface)
 	if err != nil {

@@ -2,10 +2,10 @@ package main
 
 import (
 	"github.com/NorskHelsenett/ror-agent/internal/config"
+	"github.com/NorskHelsenett/ror-agent/internal/handlers/dynamichandler"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
-	"github.com/NorskHelsenett/ror/pkg/rorresources/rordefs"
 
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/dynamicclient"
@@ -30,7 +30,7 @@ func main() {
 
 	resourceupdate.ResourceCache.MustInit(rorClientInterface)
 
-	dynamicclient.MustStart(rorClientInterface, rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent))
+	dynamicclient.MustStart(rorClientInterface, dynamichandler.NewDynamicClientHandler())
 
 	scheduler.MustStart(rorClientInterface)
 

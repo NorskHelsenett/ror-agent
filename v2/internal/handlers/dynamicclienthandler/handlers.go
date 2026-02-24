@@ -26,7 +26,7 @@ func (h *handler) AddResource(obj any) {
 	if obj == nil {
 		return // Avoid memory leaks if obj is nil
 	}
-	h.SendResource(rortypes.K8sActionAdd, obj.(*unstructured.Unstructured).Object)
+	h.sendResource(rortypes.K8sActionAdd, obj.(*unstructured.Unstructured).Object)
 
 	obj = nil
 
@@ -36,7 +36,7 @@ func (h *handler) DeleteResource(obj any) {
 	if obj == nil {
 		return // Avoid memory leaks if obj is nil
 	}
-	h.SendResource(rortypes.K8sActionDelete, obj.(*unstructured.Unstructured).Object)
+	h.sendResource(rortypes.K8sActionDelete, obj.(*unstructured.Unstructured).Object)
 	obj = nil // Clear the obj reference to avoid memory leaks
 
 }
@@ -45,12 +45,12 @@ func (h *handler) UpdateResource(_ any, obj any) {
 	if obj == nil {
 		return // Avoid memory leaks if obj is nil
 	}
-	h.SendResource(rortypes.K8sActionUpdate, obj.(*unstructured.Unstructured).Object)
+	h.sendResource(rortypes.K8sActionUpdate, obj.(*unstructured.Unstructured).Object)
 	obj = nil // Clear the obj reference to avoid memory leaks
 
 }
 
-func (h *handler) SendResource(action rortypes.ResourceAction, input map[string]interface{}) {
+func (h *handler) sendResource(action rortypes.ResourceAction, input map[string]interface{}) {
 	rorres := rorkubernetes.NewResourceFromMapInterface(input)
 	err := rorres.SetRorMeta(rortypes.ResourceRorMeta{
 		Version:  "v2",

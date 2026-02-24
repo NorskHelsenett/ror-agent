@@ -7,12 +7,13 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/NorskHelsenett/ror-agent/internal/clients/dynamicclient"
 	"github.com/NorskHelsenett/ror-agent/internal/config"
-	"github.com/NorskHelsenett/ror-agent/internal/dynamiccontroller"
+	"github.com/NorskHelsenett/ror-agent/internal/handlers/dynamichandler"
 	"github.com/NorskHelsenett/ror-agent/internal/scheduler"
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
+	"github.com/NorskHelsenett/ror-agent/pkg/controllers/dynamiccontroller"
+	"github.com/NorskHelsenett/ror/pkg/rorresources/rordefs"
 
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
@@ -71,7 +72,7 @@ func main() {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 
-	schemas := dynamicclient.InitSchema()
+	schemas := rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent)
 
 	for _, schema := range schemas {
 		check, err := discovery.IsResourceEnabled(discoveryClient, schema)
@@ -79,7 +80,7 @@ func main() {
 			rlog.Error("Could not query resources from cluster", err)
 		}
 		if check {
-			controller := dynamiccontroller.NewDynamicController(dynamicClient, schema)
+			controller := dynamiccontroller.NewDynamicController(dynamicClient, dynamichandler.GetHandlersForSchema(schema))
 
 			go func() {
 				controller.Run(stop)

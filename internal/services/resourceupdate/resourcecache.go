@@ -29,19 +29,19 @@ type resourcecache struct {
 	memLogLastEstimateBytes uint64
 }
 
-func (rc *resourcecache) Init(client clusteragentclient.RorAgentClientInterface) error {
+func (rc *resourcecache) MustInit(client clusteragentclient.RorAgentClientInterface) {
 	var err error
 	if client == nil {
 		rc.client, err = clusteragentclient.NewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
 		if err != nil {
-			return err
+			rlog.Fatal("failed to initialize cluster agent client for resource cache", err)
 		}
 	} else {
 		rc.client = client
 	}
 	rc.HashList, err = rc.client.GetRorClient().V1().Resources().GetHashList(rc.client.GetRorClient().GetOwnerref())
 	if err != nil {
-		return err
+		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
 	rlog.Info("got hashList from ror-api", rlog.Int("length", len(rc.HashList.Items)))
 
@@ -49,7 +49,6 @@ func (rc *resourcecache) Init(client clusteragentclient.RorAgentClientInterface)
 	rc.scheduler.StartAsync()
 	rc.addWorkqueScheduler(10)
 	rc.startCleanup()
-	return nil
 }
 
 func (rc resourcecache) CleanupRunning() bool {

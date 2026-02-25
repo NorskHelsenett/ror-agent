@@ -6,10 +6,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/NorskHelsenett/ror-agent/internal/config"
-	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
+	"github.com/NorskHelsenett/ror-agent/pkg/config/agentconsts"
 
-	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
@@ -23,9 +21,15 @@ import (
 
 type DynamicController struct {
 	dynInformer cache.SharedIndexInformer
+	dynHandler  DynamicHandler
 	client      dynamic.Interface
 	resource    schema.GroupVersionResource
 	noCache     bool
+}
+
+type DynamicHandler interface {
+	GetSchema() schema.GroupVersionResource
+	GetHandlers() Resourcehandlers
 }
 
 func (c *DynamicController) Run(stop <-chan struct{}) {
@@ -36,28 +40,27 @@ func (c *DynamicController) Run(stop <-chan struct{}) {
 	go c.dynInformer.Run(stop)
 }
 
+type Resourcehandlers = cache.ResourceEventHandlerFuncs
+
 // Function creates a new dynamic controller to listen for api-changes in provided GroupVersionResource
-func NewDynamicController(client dynamic.Interface, resource schema.GroupVersionResource) *DynamicController {
+func NewDynamicController(client dynamic.Interface, handler DynamicHandler) *DynamicController {
 	dynWatcher := &DynamicController{}
 
 	dynWatcher.client = client
-	dynWatcher.resource = resource
+	dynWatcher.resource = handler.GetSchema()
 	dynWatcher.noCache = dynamicWatchNoCacheEnabled()
+	dynWatcher.dynHandler = handler
 
 	if dynWatcher.noCache {
-		rlog.Info("dynamic watcher enabled", rlog.Any("gvr", resource.String()), rlog.Any("noCache", dynWatcher.noCache))
+		rlog.Info("dynamic watcher enabled", rlog.Any("gvr", dynWatcher.dynHandler.GetSchema().String()), rlog.Any("noCache", dynWatcher.noCache))
 		return dynWatcher
 	}
 
 	dynInformer := dynamicinformer.NewDynamicSharedInformerFactory(client, 0)
-	informer := dynInformer.ForResource(resource).Informer()
+	informer := dynInformer.ForResource(dynWatcher.dynHandler.GetSchema()).Informer()
 	dynWatcher.dynInformer = informer
 
-	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    addResource,
-		UpdateFunc: updateResource,
-		DeleteFunc: deleteResource,
-	})
+	_, err := informer.AddEventHandler(dynWatcher.dynHandler.GetHandlers())
 
 	if err != nil {
 		rlog.Error("Error adding event handler", err)
@@ -66,25 +69,24 @@ func NewDynamicController(client dynamic.Interface, resource schema.GroupVersion
 }
 
 func dynamicWatchNoCacheEnabled() bool {
-	return rorconfig.GetBool(config.DynamicWatchNoCacheEnv)
+	return rorconfig.GetBool(agentconsts.DynamicWatchNoCacheEnv)
 }
 
 func forceGCAfterInitialListEnabled() bool {
-	return rorconfig.GetBool(config.ForceGCAfterInitialListEnv)
+	return rorconfig.GetBool(agentconsts.ForceGCAfterInitialListEnv)
 }
 
 func forceGCAfterInitialListFreeOSMemoryEnabled() bool {
-	return rorconfig.GetBool(config.ForceGCAfterInitialListFreeOSMemoryEnv)
+	return rorconfig.GetBool(agentconsts.ForceGCAfterInitialListFreeOSMemoryEnv)
 }
 
 func maybeForceGCAfterInitialList(gvr string) {
 	if !forceGCAfterInitialListEnabled() {
 		return
 	}
-	rlog.Info("forcing GC after initial no-cache list", rlog.Any("env", config.ForceGCAfterInitialListEnv), rlog.Any("gvr", gvr))
+	rlog.Debug("forcing GC after initial no-cache list", rlog.Any("gvr", gvr))
 	runtime.GC()
 	if forceGCAfterInitialListFreeOSMemoryEnabled() {
-		// Attempts to return as much memory as possible to the OS.
 		debug.FreeOSMemory()
 	}
 }
@@ -157,7 +159,7 @@ func (c *DynamicController) noCacheInitialList(stop <-chan struct{}, backoff *ti
 
 		for i := range list.Items {
 			obj := &list.Items[i]
-			addResource(obj)
+			c.dynHandler.GetHandlers().AddFunc(obj)
 		}
 
 		resourceVersion = list.GetResourceVersion()
@@ -207,11 +209,11 @@ func (c *DynamicController) noCacheWatch(stop <-chan struct{}, resourceVersion s
 
 			switch evt.Type {
 			case "ADDED":
-				addResource(u)
+				c.dynHandler.GetHandlers().AddFunc(u)
 			case "MODIFIED":
-				updateResource(nil, u)
+				c.dynHandler.GetHandlers().UpdateFunc(nil, u)
 			case "DELETED":
-				deleteResource(u)
+				c.dynHandler.GetHandlers().DeleteFunc(u)
 			case "BOOKMARK":
 				// only updates resourceVersion
 			case "ERROR":
@@ -220,19 +222,4 @@ func (c *DynamicController) noCacheWatch(stop <-chan struct{}, resourceVersion s
 			}
 		}
 	}
-}
-
-func addResource(obj any) {
-	rawData := obj.(*unstructured.Unstructured)
-	resourceupdate.SendResource(apiresourcecontracts.K8sActionAdd, rawData)
-}
-
-func deleteResource(obj any) {
-	rawData := obj.(*unstructured.Unstructured)
-	resourceupdate.SendResource(apiresourcecontracts.K8sActionDelete, rawData)
-}
-
-func updateResource(_ any, obj any) {
-	rawData := obj.(*unstructured.Unstructured)
-	resourceupdate.SendResource(apiresourcecontracts.K8sActionUpdate, rawData)
 }

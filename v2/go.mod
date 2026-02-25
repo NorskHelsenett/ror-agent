@@ -3,7 +3,7 @@ module github.com/NorskHelsenett/ror-agent/v2
 go 1.26.0
 
 require (
-	github.com/NorskHelsenett/ror v1.14.3
+	github.com/NorskHelsenett/ror v1.14.4
 	github.com/NorskHelsenett/ror-agent v1.1.1
 	github.com/go-co-op/gocron v1.37.0
 	k8s.io/apimachinery v0.35.1

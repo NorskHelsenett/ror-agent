@@ -9,7 +9,7 @@ import (
 	"github.com/go-co-op/gocron"
 )
 
-func SetUpScheduler(rorClientInterface clusteragentclient.RorAgentClientInterface) {
+func MustStart(rorClientInterface clusteragentclient.RorAgentClientInterface) {
 	scheduler := gocron.NewScheduler(time.UTC)
 	_, err := scheduler.Every(1).Minute().Tag("heartbeat").Do(HeartbeatReporting, rorClientInterface)
 	if err != nil {
@@ -20,6 +20,5 @@ func SetUpScheduler(rorClientInterface clusteragentclient.RorAgentClientInterfac
 	if err != nil {
 		rlog.Fatal("Failed to setup metric schedule", err)
 	}
-	_ = scheduler.RunByTag("heartbeat")
 	scheduler.StartAsync()
 }

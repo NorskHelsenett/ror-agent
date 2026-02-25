@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/NorskHelsenett/ror-agent/pkg/config/agentconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 
@@ -14,9 +15,15 @@ var (
 func Init() {
 	rlog.InitializeRlog()
 	rlog.Info("Configuration initializing ...")
+	rorconfig.InitConfig()
 	rorconfig.SetDefault(configconsts.HEALTH_ENDPOINT, ":8100")
 	rorconfig.SetDefault(configconsts.POD_NAMESPACE, "ror")
 	rorconfig.SetDefault(configconsts.API_KEY_SECRET, "ror-apikey")
+	rorconfig.SetDefault(configconsts.ENABLE_PPROF, false)
+	rorconfig.SetDefault(agentconsts.DynamicWatchNoCacheEnv, true)
+	rorconfig.SetDefault(agentconsts.ForceGCAfterInitialListEnv, true)
+	rorconfig.SetDefault(configconsts.ROLE, "ror-agent")
+
 	rorconfig.AutomaticEnv()
 }
 

@@ -10,6 +10,7 @@ import (
 )
 
 func SetUpScheduler(rorAgentClientInterface clusteragentclient.RorAgentClientInterface) {
+	rlog.Info("Starting schedulers")
 	scheduler := gocron.NewScheduler(time.UTC)
 	_, err := scheduler.Every(1).Minute().Tag("metrics").Do(MetricsReporting, rorAgentClientInterface)
 	if err != nil {

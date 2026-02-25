@@ -22,18 +22,18 @@ func SendResource(action apiresourcecontracts.ResourceAction, input *unstructure
 		if ResourceCache.CleanupRunning() {
 			ResourceCache.MarkActive(resourceReturn.Uid)
 		}
-		needUpdate := ResourceCache.HashList.CheckUpdateNeeded(resourceReturn.Uid, resourceReturn.Hash)
+		needUpdate := ResourceCache.HashList.checkUpdateNeeded(resourceReturn.Uid, resourceReturn.Hash)
 		if needUpdate {
-			err = ResourceCache.sendResourceUpdateToRor(resourceReturn)
+			err = sendResourceUpdateToRor(resourceReturn)
 			if err != nil {
 				rlog.Error("error sending resource update to ror, added to retryque", err)
 				ResourceCache.Workqueue.Add(resourceReturn)
 				return
 			}
-			ResourceCache.HashList.UpdateHash(resourceReturn.Uid, resourceReturn.Hash)
+			ResourceCache.HashList.updateHash(resourceReturn.Uid, resourceReturn.Hash)
 		}
 	} else if action == apiresourcecontracts.K8sActionDelete {
-		err := ResourceCache.sendResourceUpdateToRor(resourceReturn)
+		err := sendResourceUpdateToRor(resourceReturn)
 		if err != nil {
 			rlog.Error("error sending resource update to ror, added to retryque", err)
 			ResourceCache.Workqueue.Add(resourceReturn)

@@ -1,13 +1,7 @@
 debuglevel: INFO
 replicaCount: 1
-api: https://api.ror.nhn.no
+api: https://api.ror.sky.test.nhn.no
 secretname: ror-secret
-
-agent:
-  memoryLimit: "200MiB"
-  noCache: "true"
-  forceGCAfterInitialList: "true"
-  forceGCAfterInitialListFreeOSMemory: "false"
 image:
   repository: ghcr.io/norskhelsenett/ror-cluster-agent
   pullPolicy: Always
@@ -40,7 +34,7 @@ securityContext:
 resources:
   limits:
     cpu: 1000m
-    memory: 512Mi
+    memory: 2Gi
   requests:
     cpu: 100m
     memory: 128Mi

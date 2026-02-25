@@ -34,7 +34,6 @@ import (
 )
 
 var MissingConst = "Missing ..."
-var caCertAlerted bool = false
 
 type accessGroups struct {
 	accessGroups          []string
@@ -195,10 +194,7 @@ func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInte
 				}
 			}
 		} else {
-			if !caCertAlerted {
-				rlog.Warn("Could not get in-cluster config for CA certificate extraction")
-				caCertAlerted = true
-			}
+			rlog.Warn("Could not get in-cluster config for CA certificate extraction")
 		}
 	}
 
@@ -308,7 +304,7 @@ func getIngresses(k8sClient *kubernetes.Clientset) ([]apicontracts.Ingress, erro
 			continue
 		}
 		for _, ingress := range ingresses.Items {
-			richIngress, err := utils.GetIngressDetails(context.Background(), k8sClient, &ingress)
+			richIngress, err := utils.GetIngressDetails(context.Background(), &ingress)
 			if err != nil {
 				rlog.Error("could not enrich ingress", err,
 					rlog.String("ingress", ingress.Name),

@@ -3,14 +3,13 @@ package resourceupdate
 import (
 	"testing"
 
-	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache/resourcecachehashlist"
 	"github.com/go-co-op/gocron"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_resourcecache_CleanupRunning(t *testing.T) {
 	type fields struct {
-		HashList       resourcecachehashlist.HashList
+		HashList       hashList
 		Workqueue      ResourceCacheWorkqueue
 		cleanupRunning bool
 		scheduler      *gocron.Scheduler
@@ -45,26 +44,29 @@ func Test_resourcecache_CleanupRunning(t *testing.T) {
 
 func Test_resourcecache_MarkActive(t *testing.T) {
 	type fields struct {
-		HashList       resourcecachehashlist.HashList
+		HashList       hashList
 		Workqueue      ResourceCacheWorkqueue
 		cleanupRunning bool
 		scheduler      *gocron.Scheduler
 	}
 
 	testfields := fields{
-		HashList: resourcecachehashlist.HashList{
-			Items: []resourcecachehashlist.HashItem{
+		HashList: hashList{
+			Items: []hashItem{
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac120002",
-					Hash: "1234",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac120002",
+					Hash:   "1234",
+					Active: false,
 				},
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac120022",
-					Hash: "12345",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac120022",
+					Hash:   "12345",
+					Active: false,
 				},
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac130022",
-					Hash: "12346",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac130022",
+					Hash:   "12346",
+					Active: false,
 				},
 			},
 		},
@@ -73,26 +75,28 @@ func Test_resourcecache_MarkActive(t *testing.T) {
 	}
 
 	testfieldsupdated := fields{
-		HashList: resourcecachehashlist.HashList{
-			Items: []resourcecachehashlist.HashItem{
+		HashList: hashList{
+			Items: []hashItem{
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac120002",
-					Hash: "1234",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac120002",
+					Hash:   "1234",
+					Active: true,
 				},
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac120022",
-					Hash: "12345",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac120022",
+					Hash:   "12345",
+					Active: false,
 				},
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac130022",
-					Hash: "12346",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac130022",
+					Hash:   "12346",
+					Active: false,
 				},
 			},
 		},
 		Workqueue:      ResourceCacheWorkqueue{},
 		cleanupRunning: false,
 	}
-	testfieldsupdated.HashList.MarkActive("3c99c410-3cdd-11ee-be56-0242ac120002")
 	type args struct {
 		uid string
 	}
@@ -127,25 +131,28 @@ func Test_resourcecache_MarkActive(t *testing.T) {
 
 func Test_resourcecache_runWorkqueScheduler(t *testing.T) {
 	type fields struct {
-		HashList       resourcecachehashlist.HashList
+		HashList       hashList
 		Workqueue      ResourceCacheWorkqueue
 		cleanupRunning bool
 		scheduler      *gocron.Scheduler
 	}
 	testfields := fields{
-		HashList: resourcecachehashlist.HashList{
-			Items: []resourcecachehashlist.HashItem{
+		HashList: hashList{
+			Items: []hashItem{
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac120002",
-					Hash: "1234",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac120002",
+					Hash:   "1234",
+					Active: false,
 				},
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac120022",
-					Hash: "12345",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac120022",
+					Hash:   "12345",
+					Active: false,
 				},
 				{
-					Uid:  "3c99c410-3cdd-11ee-be56-0242ac130022",
-					Hash: "12346",
+					Uid:    "3c99c410-3cdd-11ee-be56-0242ac130022",
+					Hash:   "12346",
+					Active: false,
 				},
 			},
 		},

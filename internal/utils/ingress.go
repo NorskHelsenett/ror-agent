@@ -13,10 +13,10 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	networkingV1 "k8s.io/api/networking/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/strings/slices"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // GetIngressDetails extracts information from a Kubernetes Ingress resource and converts it to an apicontracts.Ingress.
@@ -25,18 +25,16 @@ import (
 //
 // Parameters:
 //   - ctx: Context for the operation.
-//   - k8sClient: Kubernetes client to use for API calls.
 //   - ingress: Pointer to a Kubernetes Ingress resource to extract information from.
 //
 // Returns:
 //   - *apicontracts.Ingress: A pointer to the constructed Ingress object with complete details.
 //   - error: An error if the ingress is invalid or if there was a problem fetching related information.
-func GetIngressDetails(ctx context.Context, k8sClient *kubernetes.Clientset, ingress *networkingV1.Ingress) (*apicontracts.Ingress, error) {
+func GetIngressDetails(ctx context.Context, ingress *networkingV1.Ingress) (*apicontracts.Ingress, error) {
 	var newIngress apicontracts.Ingress
 	ingressNameSpace := ingress.Namespace
 	ingressName := ingress.Name
 	ingressClassName := ""
-	serviceCache := make(map[string]apicontracts.Service)
 
 	var rules []apicontracts.IngressRule
 	var health apicontracts.Health = 1
@@ -45,8 +43,11 @@ func GetIngressDetails(ctx context.Context, k8sClient *kubernetes.Clientset, ing
 		ingressClassName = *ingress.Spec.IngressClassName
 	}
 
-	if k8sClient == nil {
-		return nil, fmt.Errorf("k8sClient is nil")
+	k8sConfig := config.GetConfigOrDie()
+	k8sClient, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		rlog.Error("error in config", err)
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
 	if ingress.Spec.Rules == nil {
@@ -80,22 +81,17 @@ func GetIngressDetails(ctx context.Context, k8sClient *kubernetes.Clientset, ing
 		}
 
 		for _, irulepath := range irule.IngressRuleValue.HTTP.Paths {
+			rlog.Debug("rule for path", rlog.String("path", irulepath.Path))
 			rlog.Debug("", rlog.String("service", irulepath.Backend.Service.Name))
-			serviceName := irulepath.Backend.Service.Name
-			service, ok := serviceCache[serviceName]
-			if !ok {
-				var err error
-				service, err = GetIngressService(ctx, k8sClient, ingressNameSpace, serviceName)
-				if err != nil {
-					// Log the error and continue with an empty service, or handle as appropriate
-					rlog.Error("failed to get ingress service details", err, rlog.String("service", serviceName))
-					rules[ruleindex].Paths = append(rules[ruleindex].Paths, apicontracts.IngressPath{
-						Path:    irulepath.Path,
-						Service: apicontracts.Service{},
-					})
-					continue
-				}
-				serviceCache[serviceName] = service
+			service, err := GetIngressService(ctx, k8sClient, ingressNameSpace, irulepath.Backend.Service.Name)
+			if err != nil {
+				// Log the error and continue with an empty service, or handle as appropriate
+				rlog.Error("failed to get ingress service details", err, rlog.String("service", irulepath.Backend.Service.Name))
+				rules[ruleindex].Paths = append(rules[ruleindex].Paths, apicontracts.IngressPath{
+					Path:    irulepath.Path,
+					Service: apicontracts.Service{}, // Empty service
+				})
+				continue
 			}
 			rules[ruleindex].Paths = append(rules[ruleindex].Paths, apicontracts.IngressPath{
 				Path:    irulepath.Path,
@@ -179,49 +175,59 @@ func GetIngressService(ctx context.Context, k8sClient *kubernetes.Clientset, nam
 	var endpoints []apicontracts.EndpointAddress
 	var ports []apicontracts.ServicePort
 
-	svc, err := k8sClient.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	listOptions := metav1.ListOptions{}
+	svcs, err := k8sClient.CoreV1().Services(namespace).List(ctx, listOptions)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			rlog.Debug("Could not find Service", rlog.String("service name", serviceName))
-			return apicontracts.Service{
+		rlog.Error("could not list svcs", err, rlog.String("namespace", namespace))
+		return apicontracts.Service{}, fmt.Errorf("failed to list services in namespace %s: %w", namespace, err)
+	}
+	for _, svc := range svcs.Items {
+		if svc.Name == serviceName {
+			for _, port := range svc.Spec.Ports {
+				ports = append(ports, apicontracts.ServicePort{
+					Name:     port.Name,
+					NodePort: fmt.Sprint(port.NodePort),
+					Protocol: string(port.Protocol),
+				})
+			}
+
+			service = apicontracts.Service{
 				Name:      serviceName,
-				Type:      "",
-				Selector:  "",
-				Ports:     nil,
+				Type:      string(svc.Spec.Type),
+				Selector:  svc.Spec.Selector["app.kubernetes.io/name"],
+				Ports:     ports,
 				Endpoints: nil,
-			}, nil
+			}
+			rlog.Debug("service added ", rlog.String("service", serviceName))
 		}
-		rlog.Error("could not get svc", err, rlog.String("namespace", namespace), rlog.String("service", serviceName))
-		return apicontracts.Service{}, fmt.Errorf("failed to get service %s/%s: %w", namespace, serviceName, err)
 	}
 
-	for _, port := range svc.Spec.Ports {
-		ports = append(ports, apicontracts.ServicePort{
-			Name:     port.Name,
-			NodePort: fmt.Sprint(port.NodePort),
-			Protocol: string(port.Protocol),
-		})
+	if service.Name == "" {
+		service = apicontracts.Service{
+			Name:      serviceName,
+			Type:      "",
+			Selector:  "",
+			Ports:     nil,
+			Endpoints: nil,
+		}
+		rlog.Debug("Could not find Service", rlog.String("service name", serviceName))
 	}
 
-	service = apicontracts.Service{
-		Name:      serviceName,
-		Type:      string(svc.Spec.Type),
-		Selector:  svc.Spec.Selector["app.kubernetes.io/name"],
-		Ports:     ports,
-		Endpoints: nil,
-	}
-
-	ep, err := k8sClient.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	eps, err := k8sClient.CoreV1().Endpoints(namespace).List(ctx, listOptions)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return service, nil
-		}
-		rlog.Error("could not get eps", err, rlog.String("namespace", namespace), rlog.String("service", serviceName))
-		return service, fmt.Errorf("failed to get endpoints %s/%s: %w", namespace, serviceName, err)
+		rlog.Error("could not list eps", err, rlog.String("namespace", namespace))
+		return service, fmt.Errorf("failed to list endpoints in namespace %s for service %s: %w", namespace, serviceName, err)
 	}
+	for _, ep := range eps.Items {
+		if ep.Name != serviceName {
+			continue
+		}
 
-	for _, subset := range ep.Subsets {
-		for _, epAddress := range subset.Addresses {
+		if ep.Subsets == nil {
+			continue
+		}
+
+		for _, epAddress := range ep.Subsets[0].Addresses {
 			nodename := "None"
 			if epAddress.NodeName != nil {
 				nodename = *epAddress.NodeName
@@ -234,10 +240,10 @@ func GetIngressService(ctx context.Context, k8sClient *kubernetes.Clientset, nam
 				NodeName: nodename,
 				PodName:  podname,
 			})
+			service.Endpoints = endpoints
 		}
-	}
 
-	service.Endpoints = endpoints
+	}
 
 	return service, nil
 

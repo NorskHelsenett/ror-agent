@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/NorskHelsenett/ror-agent/internal/clients/clients"
+	"github.com/NorskHelsenett/ror-agent/internal/config"
 	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
@@ -38,12 +40,51 @@ func MetricsReporting(rorClientInterface clusteragentclient.RorAgentClientInterf
 	}
 	metricsReport.Nodes = metricsReportNodes
 
-	err = rorClientInterface.GetRorClient().V1().Metrics().PostReport(context.TODO(), metricsReport)
+	err = sendMetricsToRor(metricsReport)
+
+	return err
+}
+
+func sendMetricsToRor(metricsReport apicontracts.MetricsReport) error {
+	rorClient, err := clients.GetOrCreateRorClient()
 	if err != nil {
-		rlog.Error("error when sending metrics report to ror", err)
+		rlog.Error("Could not get ror-api client", err)
+		config.IncreaseErrorCount()
 		return err
 	}
-	rlog.Info("metrics report sent to ror")
+
+	url := "/v1/metrics"
+	response, err := rorClient.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(metricsReport).
+		Post(url)
+	if err != nil {
+		rlog.Error("Could not send metrics data to ror-api", err)
+		config.IncreaseErrorCount()
+		return err
+	}
+
+	if response == nil {
+		rlog.Error("Response is nil", err)
+		config.IncreaseErrorCount()
+		return err
+	}
+
+	if !response.IsSuccess() {
+		config.IncreaseErrorCount()
+		rlog.Error("Got unsuccessful status code from ror-api", err,
+			rlog.Int("status code", response.StatusCode()),
+			rlog.Int("error count", config.ErrorCount))
+		return err
+	} else {
+		config.ResetErrorCount()
+		rlog.Info("Metrics report sent to ror")
+
+		byteReport, err := json.Marshal(metricsReport)
+		if err == nil {
+			rlog.Debug("", rlog.String("byte report", string(byteReport)))
+		}
+	}
 	return nil
 }
 
@@ -53,7 +94,7 @@ func CreateNodeMetricsList(k8sClient *kubernetes.Clientset) ([]apicontracts.Node
 
 	data, err := k8sClient.RESTClient().Get().AbsPath("apis/metrics.k8s.io/v1beta1/nodes").DoRaw(context.TODO())
 	if err != nil {
-		rlog.Error("error converting nodemetrics", err)
+		rlog.Error("error converting podmetrics", err)
 		return metricsReportNodes, err
 	}
 

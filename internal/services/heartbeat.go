@@ -3,22 +3,24 @@ package services
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	vitiv1alpha1 "github.com/vitistack/common/pkg/v1alpha1"
+
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/k8smodels"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/nodeservice"
-	"github.com/NorskHelsenett/ror-agent/internal/models/argomodels"
 	"github.com/NorskHelsenett/ror-agent/internal/utils"
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
+	"github.com/NorskHelsenett/ror/pkg/helpers/kubernetes/metadatahelper"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/providerinterregationreport"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
@@ -27,8 +29,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -109,106 +109,46 @@ func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInte
 		return apicontracts.Cluster{}, err
 	}
 
-	dynamicClient, err := rorClientInterface.GetKubernetesClientset().GetDynamicClient()
-	if err != nil {
-		return apicontracts.Cluster{}, err
-	}
-	metricsClient, err := rorClientInterface.GetKubernetesClientset().GetMetricsClient()
-	if err != nil {
-		return apicontracts.Cluster{}, err
-	}
-
 	clusterName := "localhost"
 	workspaceName := "localhost"
 	datacenterName := "local"
 	provider := providermodels.ProviderTypeUnknown
 
-	nhnToolingMetadata, err := getNhnToolingMetadata(k8sClient, dynamicClient)
+	nhnToolingMetadata, err := getNhnToolingMetadata(rorClientInterface)
 	if err != nil {
 		rlog.Warn("NHN-Tooling is not installed?!")
 	}
 
-	k8sVersion, err := k8sClient.ServerVersion()
-	if err != nil {
-		rlog.Error("could not get kubernetes server version", err)
-	}
+	kubernetesVersion := getKubernetesServerVersion(rorClientInterface)
 
-	kubernetesVersion := MissingConst
-	if k8sVersion != nil {
-		kubernetesVersion = k8sVersion.String()
-	}
-
-	k8sVersionArray := strings.Split(kubernetesVersion, "+")
-	if len(k8sVersionArray) > 1 {
-		kubernetesVersion = k8sVersionArray[0]
-	}
-
-	nodes, err := nodeservice.GetNodes(k8sClient, metricsClient)
+	nodes, err := nodeservice.GetNodes(rorClientInterface)
 	if err != nil {
 		rlog.Error("error getting nodes", err)
 	}
+	interregationreport, err := providerinterregationreport.GetInterregationReport(rorClientInterface.GetClusterInterregator())
 
-	var k8sControlPlaneEndpoint string
+	var k8sControlPlaneEndpoint string = MissingConst
 	var controlPlane = apicontracts.ControlPlane{}
 	nodePools := make([]apicontracts.NodePool, 0)
-	if len(nodes) > 0 {
-		for _, node := range nodes {
-			if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
-				appendNodeToControlePlane(&node, &controlPlane)
-				if node.Provider == "tanzu" {
-					k8sControlPlaneEndpoint, _ = getControlPlaneEndpoint(k8sClient)
-				}
-				if node.Provider == providermodels.ProviderTypeTalos {
-					k8sControlPlaneEndpoint, _ = getControlPlaneEndpoint(k8sClient)
-				}
-			} else {
-				appendNodeToNodePools(&nodePools, &node)
-			}
-		}
-		if err != nil {
-			rlog.Error("could not extract controlplane and workers from nodes", err)
-		}
-	}
-
-	var k8sCaCertificate string
-
-	// Get the cluster CA certificate from the service account's ca.crt file
-	// This is the standard way to get the CA certificate when running inside a pod
-	caCertPath := "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-	if caCertData, err := os.ReadFile(caCertPath); err == nil {
-		k8sCaCertificate = base64.StdEncoding.EncodeToString(caCertData)
-		rlog.Debug("Successfully read cluster CA certificate from service account")
-	} else {
-		// Fallback: try to get it from REST config using the config package
-
-		if restConfig, err := rest.InClusterConfig(); err == nil {
-			rlog.Warn("Could not read CA certificate from service account", rlog.String("path", caCertPath), rlog.Any("error", err))
-			if len(restConfig.CAData) > 0 {
-				k8sCaCertificate = base64.StdEncoding.EncodeToString(restConfig.CAData)
-				rlog.Debug("Successfully read cluster CA certificate from REST config CAData")
-			} else if restConfig.CAFile != "" {
-				if caCertData, err := os.ReadFile(restConfig.CAFile); err == nil {
-					k8sCaCertificate = base64.StdEncoding.EncodeToString(caCertData)
-					rlog.Debug("Successfully read cluster CA certificate from REST config CAFile")
-				} else {
-					rlog.Error("Could not read CA certificate file", err, rlog.String("caFile", restConfig.CAFile))
-				}
-			}
+	for _, node := range nodes {
+		if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
+			appendNodeToControlePlane(&node, &controlPlane)
 		} else {
-			if !caCertAlerted {
-				rlog.Warn("Could not get in-cluster config for CA certificate extraction")
-				caCertAlerted = true
-			}
+			appendNodeToNodePools(&nodePools, &node)
 		}
 	}
 
-	if len(nodes) > 0 {
-		firstNode := nodes[0]
-		clusterName = firstNode.ClusterName
-		workspaceName = firstNode.Workspace
-		datacenterName = firstNode.Datacenter
-		provider = firstNode.Provider
+	k8sControlPlaneEndpoint, err = getControlPlaneEndpoint(k8sClient)
+	if err != nil {
+		rlog.Error("could not get control plane endpoint", err)
 	}
+
+	k8sCaCertificate := getCaCertificateFromPod()
+
+	clusterName = interregationreport.ClusterName
+	workspaceName = interregationreport.Workspace
+	datacenterName = interregationreport.Datacenter
+	provider = interregationreport.KubernetesProvider
 
 	ingresses, err := getIngresses(k8sClient)
 	if err != nil {
@@ -282,6 +222,10 @@ func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInte
 			Datacenter: apicontracts.Datacenter{
 				Name:     datacenterName,
 				Provider: provider,
+				Location: apicontracts.DatacenterLocation{
+					Region:  interregationreport.Region,
+					Country: interregationreport.Country,
+				},
 			},
 		},
 		KubeApi: apicontracts.ClusterKubeApi{
@@ -290,6 +234,66 @@ func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInte
 		},
 	}
 	return report, nil
+}
+
+func getCaCertificateFromPod() string {
+	var k8sCaCertificate string
+
+	// Get the cluster CA certificate from the service account's ca.crt file
+	// This is the standard way to get the CA certificate when running inside a pod
+	caCertPath := "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	if caCertData, err := os.ReadFile(caCertPath); err == nil {
+		k8sCaCertificate = base64.StdEncoding.EncodeToString(caCertData)
+		rlog.Debug("Successfully read cluster CA certificate from service account")
+	} else {
+		// Fallback: try to get it from REST config using the config package
+
+		if restConfig, err := rest.InClusterConfig(); err == nil {
+			rlog.Warn("Could not read CA certificate from service account", rlog.String("path", caCertPath), rlog.Any("error", err))
+			if len(restConfig.CAData) > 0 {
+				k8sCaCertificate = base64.StdEncoding.EncodeToString(restConfig.CAData)
+				rlog.Debug("Successfully read cluster CA certificate from REST config CAData")
+			} else if restConfig.CAFile != "" {
+				if caCertData, err := os.ReadFile(restConfig.CAFile); err == nil {
+					k8sCaCertificate = base64.StdEncoding.EncodeToString(caCertData)
+					rlog.Debug("Successfully read cluster CA certificate from REST config CAFile")
+				} else {
+					rlog.Error("Could not read CA certificate file", err, rlog.String("caFile", restConfig.CAFile))
+				}
+			}
+		} else {
+			if !caCertAlerted {
+				rlog.Warn("Could not get in-cluster config for CA certificate extraction")
+				caCertAlerted = true
+			}
+		}
+	}
+	return k8sCaCertificate
+}
+
+func getKubernetesServerVersion(rorClientInterface clusteragentclient.RorAgentClientInterface) string {
+
+	client, err := rorClientInterface.GetKubernetesClientset().GetDiscoveryClient()
+	if err != nil {
+		rlog.Error("could not get discovery client", err)
+		return MissingConst
+	}
+
+	k8sVersion, err := client.ServerVersion()
+	if err != nil {
+		rlog.Error("could not get kubernetes server version", err)
+	}
+
+	kubernetesVersion := MissingConst
+	if k8sVersion != nil {
+		kubernetesVersion = k8sVersion.String()
+	}
+
+	k8sVersionArray := strings.Split(kubernetesVersion, "+")
+	if len(k8sVersionArray) > 1 {
+		kubernetesVersion = k8sVersionArray[0]
+	}
+	return kubernetesVersion
 }
 
 func getIngresses(k8sClient *kubernetes.Clientset) ([]apicontracts.Ingress, error) {
@@ -323,96 +327,6 @@ func getIngresses(k8sClient *kubernetes.Clientset) ([]apicontracts.Ingress, erro
 	return ingressList, nil
 }
 
-func getNhnToolingMetadata(k8sClient *kubernetes.Clientset, dynamicClient dynamic.Interface) (k8smodels.NhnTooling, error) {
-	result := k8smodels.NhnTooling{
-		Version:      MissingConst,
-		Branch:       MissingConst,
-		AccessGroups: []string{},
-		Environment:  "dev",
-	}
-
-	namespace := rorconfig.GetString(configconsts.POD_NAMESPACE)
-	nhnToolingConfigMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), "nhn-tooling", v1.GetOptions{
-		TypeMeta:        v1.TypeMeta{},
-		ResourceVersion: "",
-	})
-
-	if err != nil {
-		return result, fmt.Errorf("could not find config map %s for ror in namespace %s", "nhn-tooling", namespace)
-	}
-
-	if nhnToolingConfigMap.Data == nil {
-		return result, errors.New("no data in config map for ror")
-	}
-
-	environment := nhnToolingConfigMap.Data["environment"]
-	toolingVersion := nhnToolingConfigMap.Data["toolingVersion"]
-
-	accessGroups := NewAccessGroupsFromData(nhnToolingConfigMap.Data)
-
-	if environment == "" {
-		environment = "dev"
-	}
-
-	if toolingVersion == "" {
-		toolingVersion = MissingConst
-	}
-
-	branch := MissingConst
-	nhnToolingApp, err := getNhnToolingInfo(dynamicClient)
-	if err != nil {
-		rlog.Error("could not get nhn-tooling application", err)
-	} else {
-		branch = nhnToolingApp.Spec.Source.TargetRevision
-		if len(nhnToolingApp.Status.Sync.Revision) < 20 {
-			toolingVersion = nhnToolingApp.Status.Sync.Revision
-		}
-	}
-
-	result.Version = toolingVersion
-	result.Environment = environment
-	result.AccessGroups = accessGroups.StringArray()
-	result.Branch = branch
-
-	return result, nil
-}
-
-func getNhnToolingInfo(dynamicClient dynamic.Interface) (argomodels.Application, error) {
-	result := argomodels.Application{}
-	applications, err := dynamicClient.Resource(schema.GroupVersionResource{
-		Group:    "argoproj.io",
-		Version:  "v1alpha1",
-		Resource: "applications",
-	}).
-		Namespace("argocd").
-		Get(context.TODO(), "nhn-tooling", v1.GetOptions{})
-	if err != nil {
-		rlog.Error("could not get nhn-tooling application", err)
-		return result, err
-	}
-
-	appByteArray, err := applications.MarshalJSON()
-	if err != nil {
-		rlog.Error("could not marshal application", err)
-		return result, err
-	}
-
-	var nhnTooling argomodels.Application
-	err = json.Unmarshal(appByteArray, &nhnTooling)
-	if err != nil {
-		rlog.Error("could not marshal applications", err)
-		return result, err
-	}
-
-	appByteArray = nil // Clear the byte array to free up memory
-
-	if nhnTooling.Metadata.Name == "" {
-		return result, errors.New("could not find nhn-tooling application")
-	}
-
-	return nhnTooling, nil
-}
-
 func appendNodeToControlePlane(node *k8smodels.Node, controlPlane *apicontracts.ControlPlane) {
 	apiNode := apicontracts.Node{
 		Name:                    node.Name,
@@ -441,6 +355,7 @@ func appendNodeToControlePlane(node *k8smodels.Node, controlPlane *apicontracts.
 	controlPlane.Metrics.Memory = controlPlane.Metrics.Memory + apiNode.Metrics.Memory
 	controlPlane.Metrics.CpuConsumed = controlPlane.Metrics.CpuConsumed + apiNode.Metrics.CpuConsumed
 	controlPlane.Metrics.MemoryConsumed = controlPlane.Metrics.MemoryConsumed + apiNode.Metrics.MemoryConsumed
+
 }
 
 func appendNodeToNodePools(nodePools *[]apicontracts.NodePool, node *k8smodels.Node) {
@@ -521,10 +436,10 @@ func getControlPlaneEndpoint(clientset *kubernetes.Clientset) (string, error) {
 		return "", errors.New(errMsg)
 	}
 	for _, node := range nodes.Items {
-		if endpoint, ok := node.Annotations["ror.io/api-endpoint-addr"]; ok {
+		if endpoint, ok := metadatahelper.GetAnnotationOrLabel(node.ObjectMeta, vitiv1alpha1.K8sEndpointAnnotation); ok {
 			return endpoint, nil
 		}
-		if endpoint, ok := node.Annotations["vitistack.io/kubernetes-endpoint-addr"]; ok {
+		if endpoint, ok := metadatahelper.GetAnnotationOrLabel(node.ObjectMeta, "ror.io/api-endpoint-addr"); ok {
 			return endpoint, nil
 		}
 	}
@@ -549,7 +464,10 @@ func getControlPlaneEndpoint(clientset *kubernetes.Clientset) (string, error) {
 		rlog.Error(errMsg, err)
 		return "", errors.New(errMsg)
 	}
-
+	if clusterConfigurationValues.ControlPlaneEndpoint == "" {
+		errMsg := "getControlPlaneEndpoint: ControlPlaneEndpoint is empty in configmap"
+		return "", errors.New(errMsg)
+	}
 	return clusterConfigurationValues.ControlPlaneEndpoint, nil
 }
 

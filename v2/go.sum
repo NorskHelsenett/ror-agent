@@ -1,9 +1,9 @@
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/NorskHelsenett/ror v1.14.3 h1:TzTYe2t8r1buFGId7wCLewsvwWtOt293HYtFybI2SKg=
-github.com/NorskHelsenett/ror v1.14.3/go.mod h1:IG7tZZ2ZXoYoFxtbGg6Blw9n/C4qvy7yZjBwt8ataU0=
-github.com/NorskHelsenett/ror-agent v1.1.0 h1:H0CWxl1fXZhXQm2vIMVoVpSIjbg7tFE4lpCPpdG/8Nc=
-github.com/NorskHelsenett/ror-agent v1.1.0/go.mod h1:qOxLn9HoHYaqCdSwqpzbAP9icd1wWdn0OxOvwtBsgwM=
+github.com/NorskHelsenett/ror v1.15.0 h1:eqtTylOBFD1UzfgqT/OMImhrA7OhMvp9KeIo4uZGQ08=
+github.com/NorskHelsenett/ror v1.15.0/go.mod h1:IG7tZZ2ZXoYoFxtbGg6Blw9n/C4qvy7yZjBwt8ataU0=
+github.com/NorskHelsenett/ror-agent v1.1.3 h1:/u91T6AdvqpIYj9F7N0PHGOSqWzOxCxyxNETPPt9AGg=
+github.com/NorskHelsenett/ror-agent v1.1.3/go.mod h1:qOxLn9HoHYaqCdSwqpzbAP9icd1wWdn0OxOvwtBsgwM=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=

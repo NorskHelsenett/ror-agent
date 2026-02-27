@@ -211,29 +211,65 @@ func GetIngressService(ctx context.Context, k8sClient *kubernetes.Clientset, nam
 		Endpoints: nil,
 	}
 
-	ep, err := k8sClient.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	// Kubernetes v1 Endpoints is deprecated in v1.33+; use EndpointSlice when available.
+	sliceList, err := k8sClient.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("kubernetes.io/service-name=%s", serviceName),
+	})
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return service, nil
+		// Fallback for clusters where EndpointSlice isn't served/enabled.
+		if !apierrors.IsNotFound(err) {
+			rlog.Error("could not list endpoint slices", err, rlog.String("namespace", namespace), rlog.String("service", serviceName))
+			return service, fmt.Errorf("failed to list endpoint slices %s/%s: %w", namespace, serviceName, err)
 		}
-		rlog.Error("could not get eps", err, rlog.String("namespace", namespace), rlog.String("service", serviceName))
-		return service, fmt.Errorf("failed to get endpoints %s/%s: %w", namespace, serviceName, err)
-	}
 
-	for _, subset := range ep.Subsets {
-		for _, epAddress := range subset.Addresses {
-			nodename := "None"
-			if epAddress.NodeName != nil {
-				nodename = *epAddress.NodeName
+		ep, epErr := k8sClient.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+		if epErr != nil {
+			if apierrors.IsNotFound(epErr) {
+				return service, nil
 			}
-			podname := "None"
-			if epAddress.TargetRef != nil {
-				podname = epAddress.TargetRef.Name
+			rlog.Error("could not get eps", epErr, rlog.String("namespace", namespace), rlog.String("service", serviceName))
+			return service, fmt.Errorf("failed to get endpoints %s/%s: %w", namespace, serviceName, epErr)
+		}
+
+		for _, subset := range ep.Subsets {
+			for _, epAddress := range subset.Addresses {
+				nodename := "None"
+				if epAddress.NodeName != nil {
+					nodename = *epAddress.NodeName
+				}
+				podname := "None"
+				if epAddress.TargetRef != nil {
+					podname = epAddress.TargetRef.Name
+				}
+				endpoints = append(endpoints, apicontracts.EndpointAddress{
+					NodeName: nodename,
+					PodName:  podname,
+				})
 			}
-			endpoints = append(endpoints, apicontracts.EndpointAddress{
-				NodeName: nodename,
-				PodName:  podname,
-			})
+		}
+	} else {
+		seen := make(map[string]struct{})
+		for _, slice := range sliceList.Items {
+			for _, ep := range slice.Endpoints {
+				nodename := "None"
+				if ep.NodeName != nil {
+					nodename = *ep.NodeName
+				}
+				podname := "None"
+				if ep.TargetRef != nil {
+					podname = ep.TargetRef.Name
+				}
+
+				key := nodename + "|" + podname
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				endpoints = append(endpoints, apicontracts.EndpointAddress{
+					NodeName: nodename,
+					PodName:  podname,
+				})
+			}
 		}
 	}
 

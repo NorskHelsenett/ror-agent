@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/NorskHelsenett/ror v1.15.0
-	github.com/NorskHelsenett/ror-agent v1.1.3
+	github.com/NorskHelsenett/ror-agent v1.1.4
 	github.com/go-co-op/gocron v1.37.0
 	k8s.io/apimachinery v0.35.1
 )

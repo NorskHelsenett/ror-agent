@@ -1,7 +1,7 @@
 package scheduler
 
 import (
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 

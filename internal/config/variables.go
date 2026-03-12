@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/NorskHelsenett/ror-agent/pkg/config/agentconsts"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/config/agentconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 

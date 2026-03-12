@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror-agent/internal/services/authservice"
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"

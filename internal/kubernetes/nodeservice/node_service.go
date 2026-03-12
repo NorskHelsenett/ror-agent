@@ -5,8 +5,8 @@ import (
 	"context"
 	"math"
 
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/k8smodels"
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 

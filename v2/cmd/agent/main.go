@@ -3,10 +3,10 @@ package main
 import (
 	_ "net/http/pprof"
 
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/dynamicclient"
-	"github.com/NorskHelsenett/ror-agent/pkg/services/healthservice"
-	"github.com/NorskHelsenett/ror-agent/pkg/services/pprofservice"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/dynamicclient"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/services/healthservice"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/services/pprofservice"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/agentconfig"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/handlers/clusterhandler"
 	"github.com/NorskHelsenett/ror-agent/v2/internal/handlers/dynamicclienthandler"
@@ -29,7 +29,7 @@ func main() {
 
 	resourceCache := resourcecache.MustInitNewResourceCache(resourcecache.ResourceCacheConfig{WorkQueueInterval: 10, RorClient: rorClientInterface.GetRorClient()})
 
-	clusterhandler.MustStart()
+	clusterhandler.MustStart(rorClientInterface, resourceCache)
 
 	dynamicclient.MustStart(rorClientInterface, dynamicclienthandler.NewDynamicClientHandler(resourceCache))
 

@@ -1,7 +1,7 @@
 package dynamicclienthandler
 
 import (
-	"github.com/NorskHelsenett/ror-agent/pkg/controllers/dynamiccontroller"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/controllers/dynamiccontroller"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rorkubernetes"

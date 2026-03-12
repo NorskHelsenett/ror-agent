@@ -11,9 +11,9 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apikeystypes/v2"
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
-	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport"
-	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport/httpauthprovider"
-	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/transports/resttransport/httpclient"
+	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2/transports/resttransport"
+	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2/transports/resttransport/httpauthprovider"
+	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2/transports/resttransport/httpclient"
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
@@ -130,7 +130,7 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		return nil, err
 	}
 
-	selfdata, err := client.rorAPIClient.V2().Self().Get()
+	selfdata, err := client.rorAPIClient.V2().Self().Get(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 			rlog.Error("failed to setup RorClient", err)
 			return err
 		}
-		selfdata, err := r.rorAPIClient.V2().Self().Get()
+		selfdata, err := r.rorAPIClient.V2().Self().Get(context.TODO())
 		if err != nil {
 			return err
 		}
@@ -249,7 +249,7 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 		rlog.Info("api key secret not found, registering new key")
 
 		r.initUnathorizedRorClient()
-		resp, err := r.rorAPIClient.ApiKeysV2().RegisterAgent(apikeystypes.RegisterClusterRequest{
+		resp, err := r.rorAPIClient.ApiKeysV2().RegisterAgent(context.TODO(), apikeystypes.RegisterClusterRequest{
 			ClusterId: r.config.identifier,
 		})
 		if err != nil {
@@ -382,6 +382,7 @@ func (r *rorAgentClient) initAuthorizedRorClient() error {
 	}
 	transport := resttransport.NewRorHttpTransport(&clientConfig)
 	r.rorAPIClient = rorclient.NewRorClient(transport)
+
 	if err := r.rorAPIClient.CheckConnection(); err != nil {
 		return fmt.Errorf("failed to ping RorClient: %w", err)
 	}

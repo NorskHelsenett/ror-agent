@@ -3,7 +3,7 @@ package scheduler
 import (
 	"time"
 
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	"github.com/go-co-op/gocron"

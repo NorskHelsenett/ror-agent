@@ -11,10 +11,10 @@ import (
 
 	vitiv1alpha1 "github.com/vitistack/common/pkg/v1alpha1"
 
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/k8smodels"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/nodeservice"
 	"github.com/NorskHelsenett/ror-agent/internal/utils"
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"

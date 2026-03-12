@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/k8smodels"
 	"github.com/NorskHelsenett/ror-agent/internal/models/argomodels"
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/rlog"

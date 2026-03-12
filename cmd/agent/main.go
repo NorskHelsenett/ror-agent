@@ -7,10 +7,10 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/services"
 	"github.com/NorskHelsenett/ror-agent/internal/services/resourceupdate"
 
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
-	"github.com/NorskHelsenett/ror-agent/pkg/clients/dynamicclient"
-	"github.com/NorskHelsenett/ror-agent/pkg/services/healthservice"
-	"github.com/NorskHelsenett/ror-agent/pkg/services/pprofservice"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/dynamicclient"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/services/healthservice"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/services/pprofservice"
 
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 

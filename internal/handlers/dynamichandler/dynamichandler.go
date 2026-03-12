@@ -1,7 +1,7 @@
 package dynamichandler
 
 import (
-	"github.com/NorskHelsenett/ror-agent/pkg/controllers/dynamiccontroller"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/controllers/dynamiccontroller"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 

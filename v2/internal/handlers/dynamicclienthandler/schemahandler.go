@@ -1,7 +1,7 @@
 package dynamicclienthandler
 
 import (
-	"github.com/NorskHelsenett/ror-agent/pkg/controllers/dynamiccontroller"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/controllers/dynamiccontroller"
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"

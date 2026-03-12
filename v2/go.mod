@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/NorskHelsenett/ror v1.16.0
-	github.com/NorskHelsenett/ror-agent/common v1.0.0
+	github.com/NorskHelsenett/ror-agent/common v1.0.1
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/uuid v1.6.0
 	k8s.io/apimachinery v0.35.2

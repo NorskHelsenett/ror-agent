@@ -1,6 +1,8 @@
 package scheduler
 
 import (
+	"context"
+
 	"github.com/NorskHelsenett/ror-agent/pkg/clients/clusteragentclient"
 
 	"github.com/NorskHelsenett/ror/pkg/rlog"
@@ -15,7 +17,7 @@ func HeartbeatReporting(rorClientInterface clusteragentclient.RorAgentClientInte
 		return err
 	}
 
-	err = rorClientInterface.GetRorClient().V1().Clusters().SendHeartbeat(clusterReport)
+	err = rorClientInterface.GetRorClient().V1().Clusters().SendHeartbeat(context.TODO(), clusterReport)
 	if err != nil {
 		rlog.Error("error when sending heartbeat report to ror", err)
 		return err

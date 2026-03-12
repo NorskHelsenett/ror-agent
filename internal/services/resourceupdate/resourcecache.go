@@ -1,6 +1,7 @@
 package resourceupdate
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"time"
@@ -39,7 +40,7 @@ func (rc *resourcecache) MustInit(client clusteragentclient.RorAgentClientInterf
 	} else {
 		rc.client = client
 	}
-	rc.HashList, err = rc.client.GetRorClient().V1().Resources().GetHashList(rc.client.GetRorClient().GetOwnerref())
+	rc.HashList, err = rc.client.GetRorClient().V1().Resources().GetHashList(context.TODO(), rc.client.GetRorClient().GetOwnerref())
 	if err != nil {
 		rlog.Fatal("could not get hashlist for clusterid", err)
 	}
@@ -130,11 +131,11 @@ func (rc *resourcecache) sendResourceUpdateToRor(resourceUpdate *apiresourcecont
 
 	switch resourceUpdate.Action {
 	case apiresourcecontracts.K8sActionUpdate:
-		err = rorClient.V1().Resources().Update(resourceUpdate)
+		err = rorClient.V1().Resources().Update(context.TODO(), resourceUpdate)
 	case apiresourcecontracts.K8sActionAdd:
-		err = rorClient.V1().Resources().Create(resourceUpdate)
+		err = rorClient.V1().Resources().Create(context.TODO(), resourceUpdate)
 	case apiresourcecontracts.K8sActionDelete:
-		err = rorClient.V1().Resources().Delete(resourceUpdate.Uid)
+		err = rorClient.V1().Resources().Delete(context.TODO(), resourceUpdate.Uid)
 	default:
 		rlog.Error("Not implemented", nil)
 

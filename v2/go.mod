@@ -4,9 +4,8 @@ go 1.26.1
 
 require (
 	github.com/NorskHelsenett/ror v1.15.5
-	github.com/NorskHelsenett/ror-agent v1.1.3
+	github.com/NorskHelsenett/ror-agent v1.1.4
 	github.com/go-co-op/gocron v1.37.0
-	github.com/google/uuid v1.6.0
 	k8s.io/apimachinery v0.35.2
 )
 
@@ -41,6 +40,7 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

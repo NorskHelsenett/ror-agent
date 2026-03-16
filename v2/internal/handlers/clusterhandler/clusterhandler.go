@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources"
@@ -56,7 +57,22 @@ func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCache
 	}
 	clusterresource.RorMeta.LastReported = time.Now().String()
 	clusterresource.Metadata.Name = interregator.GetClusterId()
-	clusterresource.KubernetesClusterResource.Spec.SlackChannels = []string{"#test"}
+	clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
+		ClusterId:          agentclient.GetClusterId(),
+		ClusterName:        interregator.GetClusterName(),
+		KubernetesProvider: interregator.GetKubernetesProvider(),
+		Az:                 interregator.GetAz(),
+		Region:             interregator.GetRegion(),
+		Country:            interregator.GetCountry(),
+		Workspace:          interregator.GetClusterWorkspace(),
+		Datacenter:         interregator.GetDatacenter(),
+		Environment:        interregator.GetEnvironment(),
+		Versions: map[string]string{
+			"RorAgent": rorversion.GetRorVersion().Version,
+		},
+		LastSeen: time.Now(),
+	}
+
 	//stringhelper.PrettyprintStruct(clusterresource)
 
 	clusterresource.GenRorHash()

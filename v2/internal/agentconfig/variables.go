@@ -6,9 +6,6 @@
 //It also contains the GetRorVersion function which returns the RorVersion struct
 //which contains the version and commit of the agent
 //
-// The version and commit are set at compile time using the ldflags
-// The version and commit are set to the default  v1.1.0/FFFFF if not set at compile time
-//
 // The configuration variables are set to the default values if not set in the environment
 // The environment variables required are:
 // ROLE default value is ClusterAgent

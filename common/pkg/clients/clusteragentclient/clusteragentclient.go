@@ -42,9 +42,10 @@ type RorAgentClientInterface interface {
 	GetRorClient() rorclient.RorClientInterface
 	GetKubernetesClientset() *kubernetesclient.K8sClientsets
 	GetClusterInterregator() interregatortypes.ClusterInterregator
+
 	GetSigs() chan os.Signal
 	GetStopChan() chan struct{}
-
+	GetClusterId() string
 	PingRorAPI() error
 }
 
@@ -434,4 +435,8 @@ func (r *rorAgentClient) GetStopChan() chan struct{} {
 
 func (r *rorAgentClient) GetClusterInterregator() interregatortypes.ClusterInterregator {
 	return r.config.interregator
+}
+
+func (r *rorAgentClient) GetClusterId() string {
+	return r.config.identifier
 }

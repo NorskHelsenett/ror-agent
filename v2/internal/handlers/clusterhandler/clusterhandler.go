@@ -28,6 +28,24 @@ func MustStart(agentclient clusteragentclient.RorAgentClientInterface, resourceC
 func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
 	rlog.Info("Starting cluster handler", rlog.String("clusterid", agentclient.GetClusterInterregator().GetClusterId()))
 
+	if err := updateClusterResource(agentclient, resourceCacheInterface); err != nil {
+		return err
+	}
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := updateClusterResource(agentclient, resourceCacheInterface); err != nil {
+				rlog.Error("error updating cluster resource", err)
+			}
+		}
+	}()
+
+	return nil
+}
+
+func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
 	// Get myself
 	existing, err := agentclient.GetRorClient().V2().Resources().Get(context.TODO(), rorresources.ResourceQuery{
 		VersionKind: rortypes.ResourceKubernetesClusterGVK,
@@ -52,28 +70,33 @@ func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCache
 		if err != nil {
 			return err
 		}
+		clusterresource.RorMeta.LastReported = time.Now().String()
+		clusterresource.Metadata.Name = interregator.GetClusterId()
+		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
+			ClusterId:          agentclient.GetClusterId(),
+			ClusterName:        interregator.GetClusterName(),
+			KubernetesProvider: interregator.GetKubernetesProvider(),
+			Az:                 interregator.GetAz(),
+			Region:             interregator.GetRegion(),
+			Country:            interregator.GetCountry(),
+			Workspace:          interregator.GetClusterWorkspace(),
+			Datacenter:         interregator.GetDatacenter(),
+			Environment:        getEnvironment(agentclient, interregator),
+			Versions: map[string]string{
+				"RorAgent": rorversion.GetRorVersion().Version,
+			},
+			LastSeen: time.Now(),
+		}
 	}
 
 	if len(existing.Resources) == 1 {
 		clusterresource = rorresources.NewResourceFromStruct(*existing.Resources[0])
 		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
-	}
-	clusterresource.RorMeta.LastReported = time.Now().String()
-	clusterresource.Metadata.Name = interregator.GetClusterId()
-	clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
-		ClusterId:          agentclient.GetClusterId(),
-		ClusterName:        interregator.GetClusterName(),
-		KubernetesProvider: interregator.GetKubernetesProvider(),
-		Az:                 interregator.GetAz(),
-		Region:             interregator.GetRegion(),
-		Country:            interregator.GetCountry(),
-		Workspace:          interregator.GetClusterWorkspace(),
-		Datacenter:         interregator.GetDatacenter(),
-		Environment:        getEnvironment(agentclient, interregator),
-		Versions: map[string]string{
-			"RorAgent": rorversion.GetRorVersion().Version,
-		},
-		LastSeen: time.Now(),
+		clusterresource.RorMeta.LastReported = time.Now().String()
+		clusterresource.Metadata.Name = interregator.GetClusterId()
+		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
+			LastSeen: time.Now(),
+		}
 	}
 
 	//stringhelper.PrettyprintStruct(clusterresource)

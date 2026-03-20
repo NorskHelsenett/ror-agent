@@ -2,6 +2,7 @@ package clusterhandler
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
@@ -51,8 +52,12 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		VersionKind: rortypes.ResourceKubernetesClusterGVK,
 	},
 	)
-	if err != nil || len(existing.Resources) > 1 {
-		rlog.Error("error fetching existing resources for cluster handler", err)
+	if err != nil {
+		return fmt.Errorf("error fetching existing resources for cluster handler: %w", err)
+	}
+	if len(existing.Resources) > 1 {
+		rlog.Warn("multiple existing resources for cluster handler, using first", rlog.Int("count", len(existing.Resources)))
+		existing.Resources = existing.Resources[:1]
 	}
 
 	// Add cluster resource to workqueue to ensure it exists in the system and to trigger any logic related to it
@@ -85,6 +90,7 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 			Versions: map[string]string{
 				"RorAgent": rorversion.GetRorVersion().Version,
 			},
+			Nodes:    getNodes(agentclient),
 			LastSeen: time.Now(),
 		}
 	}
@@ -109,6 +115,55 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	resourceCacheInterface.AddResource(clusterresource)
 
 	return nil
+}
+
+func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.KubernetesClusterAgentStatusNodes {
+	interregator := agentclient.GetClusterInterregator()
+	nodes := interregator.Nodes().Get()
+
+	nodepoolMap := make(map[string][]rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes)
+	var controlPlane []rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes
+
+	for _, node := range nodes {
+		cpuQuantity := node.Status.Capacity["cpu"]
+		memoryQuantity := node.Status.Capacity["memory"]
+
+		nodeInfo := rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes{
+			Name:              node.Name,
+			Cpu:               int(cpuQuantity.Value()),
+			Memory:            memoryQuantity.Value(),
+			Architecture:      node.Status.NodeInfo.Architecture,
+			KubernetesVersion: node.Status.NodeInfo.KubeletVersion,
+		}
+
+		if _, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]; isControlPlane {
+			controlPlane = append(controlPlane, nodeInfo)
+			continue
+		}
+
+		poolName := node.Labels["topology.kubernetes.io/zone"]
+		if np, ok := node.Labels["node.kubernetes.io/nodepool"]; ok {
+			poolName = np
+		}
+		if poolName == "" {
+			poolName = "default"
+		}
+
+		nodepoolMap[poolName] = append(nodepoolMap[poolName], nodeInfo)
+	}
+
+	var nodepools []rortypes.KubernetesClusterAgentStatusNodesNodepools
+	for name, poolNodes := range nodepoolMap {
+		nodepools = append(nodepools, rortypes.KubernetesClusterAgentStatusNodesNodepools{
+			Name:  name,
+			Nodes: poolNodes,
+		})
+	}
+
+	return rortypes.KubernetesClusterAgentStatusNodes{
+		ControllPlane: controlPlane,
+		Nodepools:     nodepools,
+	}
 }
 
 const (

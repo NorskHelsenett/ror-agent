@@ -5,8 +5,11 @@ import (
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v2"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources"
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
@@ -66,7 +69,7 @@ func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCache
 		Country:            interregator.GetCountry(),
 		Workspace:          interregator.GetClusterWorkspace(),
 		Datacenter:         interregator.GetDatacenter(),
-		Environment:        interregator.GetEnvironment(),
+		Environment:        getEnvironment(agentclient, interregator),
 		Versions: map[string]string{
 			"RorAgent": rorversion.GetRorVersion().Version,
 		},
@@ -80,4 +83,64 @@ func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCache
 	resourceCacheInterface.AddResource(clusterresource)
 
 	return nil
+}
+
+const (
+	hintsConfigmap = "nhn-tooling"
+)
+
+// getEnvironment determines the environment of the cluster based on the interregator's GetEnvironment method.
+// If the interregator returns a known environment, it will try to get a configmap/key
+// lastly it will guestimate the environment based on the cluster name, region and az, using a simple heuristic.
+func getEnvironment(agentclient clusteragentclient.RorAgentClientInterface, interregator interregatortypes.ClusterInterregator) string {
+	interregatorEnv := interregator.GetEnvironment()
+	if interregatorEnv != providermodels.UNKNOWN_UNDEFINED && interregatorEnv != providermodels.UNKNOWN_ENVIRONMENT {
+		return interregatorEnv
+	}
+	cmEnv := getEnvironmentFromConfigMap(agentclient)
+	if cmEnv != providermodels.UNKNOWN_ENVIRONMENT {
+		return cmEnv
+	}
+
+	return guessEnvironment(interregator.GetClusterName())
+}
+
+func getEnvironmentFromConfigMap(agentclient clusteragentclient.RorAgentClientInterface) string {
+	// Try to get environment from configmap
+	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
+	if err != nil {
+		rlog.Warn("could not get kubernetes clientset to get configmap, falling back to heuristic", rlog.String("configmap", hintsConfigmap))
+		return providermodels.UNKNOWN_ENVIRONMENT
+	}
+
+	cm, err := client.CoreV1().ConfigMaps(rorconfig.GetString(rorconfig.POD_NAMESPACE)).Get(context.TODO(), hintsConfigmap, v1.GetOptions{})
+	if err != nil {
+		rlog.Warn("could not get configmap for environment hints, falling back to heuristic", rlog.String("configmap", hintsConfigmap), rlog.String("namespace", rorconfig.GetString(rorconfig.POD_NAMESPACE)))
+		return providermodels.UNKNOWN_ENVIRONMENT
+	}
+	env, ok := cm.Data["environment"]
+	if !ok {
+		rlog.Warn("configmap for environment hints did not contain 'environment' key, falling back to heuristic", rlog.String("configmap", hintsConfigmap))
+		return providermodels.UNKNOWN_ENVIRONMENT
+	}
+	return env
+}
+
+func guessEnvironment(clusterName string) string {
+	// if the name is [dtqp]-* we assume it's a dev/test/qa/prod cluster, and we use that as environment
+	if len(clusterName) > 2 {
+		prefix := clusterName[:2]
+		switch prefix {
+		case "d-":
+			return "dev"
+		case "t-":
+			return "test"
+		case "q-":
+			return "qa"
+		case "p-":
+			return "prod"
+		}
+	}
+
+	return providermodels.UNKNOWN_UNDEFINED
 }

@@ -3,7 +3,7 @@ module github.com/NorskHelsenett/ror-agent/v2
 go 1.26.1
 
 require (
-	github.com/NorskHelsenett/ror v1.17.2
+	github.com/NorskHelsenett/ror v1.17.6
 	github.com/NorskHelsenett/ror-agent/common v1.0.2
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/uuid v1.6.0
@@ -110,7 +110,7 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
-	google.golang.org/grpc v1.79.2 // indirect
+	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

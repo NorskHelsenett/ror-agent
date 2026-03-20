@@ -7,7 +7,7 @@ require (
 	github.com/NorskHelsenett/ror-agent/common v1.0.2
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/uuid v1.6.0
-	k8s.io/apimachinery v0.35.2
+	k8s.io/apimachinery v0.35.3
 )
 
 require (

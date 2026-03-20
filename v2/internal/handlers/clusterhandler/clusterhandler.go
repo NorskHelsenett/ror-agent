@@ -75,8 +75,21 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		if err != nil {
 			return err
 		}
-		clusterresource.RorMeta.LastReported = time.Now().String()
-		clusterresource.Metadata.Name = interregator.GetClusterId()
+	}
+
+	if len(existing.Resources) == 1 {
+		clusterresource = rorresources.NewResourceFromStruct(*existing.Resources[0])
+		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
+	}
+
+	// Full update if resource is new or agent version changed, otherwise just update partial
+	needsFullUpdate := len(existing.Resources) == 0 ||
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions["RorAgent"] != rorversion.GetRorVersion().Version
+
+	clusterresource.RorMeta.LastReported = time.Now().String()
+	clusterresource.Metadata.Name = interregator.GetClusterId()
+
+	if needsFullUpdate {
 		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
 			ClusterId:          agentclient.GetClusterId(),
 			ClusterName:        interregator.GetClusterName(),
@@ -93,18 +106,10 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 			Nodes:    getNodes(agentclient),
 			LastSeen: time.Now(),
 		}
-	}
-
-	if len(existing.Resources) == 1 {
-		clusterresource = rorresources.NewResourceFromStruct(*existing.Resources[0])
-		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
-		clusterresource.RorMeta.LastReported = time.Now().String()
-		clusterresource.Metadata.Name = interregator.GetClusterId()
-		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
-			LastSeen: time.Now(),
-			Versions: map[string]string{
-				"RorAgent": rorversion.GetRorVersion().Version,
-			},
+	} else {
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.LastSeen = time.Now()
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions = map[string]string{
+			"RorAgent": rorversion.GetRorVersion().Version,
 		}
 	}
 

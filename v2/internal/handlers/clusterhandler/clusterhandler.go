@@ -2,19 +2,21 @@ package clusterhandler
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
-	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v2"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources"
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
 	"github.com/google/uuid"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -51,8 +53,12 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		VersionKind: rortypes.ResourceKubernetesClusterGVK,
 	},
 	)
-	if err != nil || len(existing.Resources) > 1 {
-		rlog.Error("error fetching existing resources for cluster handler", err)
+	if err != nil {
+		return fmt.Errorf("error fetching existing resources for cluster handler: %w", err)
+	}
+	if len(existing.Resources) > 1 {
+		rlog.Warn("multiple existing resources for cluster handler, using first", rlog.Int("count", len(existing.Resources)))
+		existing.Resources = existing.Resources[:1]
 	}
 
 	// Add cluster resource to workqueue to ensure it exists in the system and to trigger any logic related to it
@@ -70,8 +76,23 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		if err != nil {
 			return err
 		}
-		clusterresource.RorMeta.LastReported = time.Now().String()
-		clusterresource.Metadata.Name = interregator.GetClusterId()
+	}
+
+	if len(existing.Resources) == 1 {
+		clusterresource = rorresources.NewResourceFromStruct(*existing.Resources[0])
+		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
+	}
+
+	// Full update if resource is new or agent version changed, otherwise just update partial
+	needsFullUpdate := len(existing.Resources) == 0 ||
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions["RorAgent"] != rorversion.GetRorVersion().Version
+
+	clusterresource.RorMeta.LastReported = time.Now().String()
+	clusterresource.Metadata.Name = interregator.GetClusterId()
+
+	hintsData := getHintsConfigMap(agentclient)
+
+	if needsFullUpdate {
 		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
 			ClusterId:          agentclient.GetClusterId(),
 			ClusterName:        interregator.GetClusterName(),
@@ -81,25 +102,17 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 			Country:            interregator.GetCountry(),
 			Workspace:          interregator.GetClusterWorkspace(),
 			Datacenter:         interregator.GetDatacenter(),
-			Environment:        getEnvironment(agentclient, interregator),
-			Versions: map[string]string{
-				"RorAgent": rorversion.GetRorVersion().Version,
-			},
-			LastSeen: time.Now(),
+			Environment:        getEnvironment(agentclient, hintsData),
+			Versions:           getVersions(hintsData),
+			Nodes:              getNodes(agentclient),
+			LastSeen:           time.Now(),
+			CreatedAt:          getCreatedTime(agentclient),
+			Urls:               getUrls(agentclient),
 		}
-	}
-
-	if len(existing.Resources) == 1 {
-		clusterresource = rorresources.NewResourceFromStruct(*existing.Resources[0])
-		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
-		clusterresource.RorMeta.LastReported = time.Now().String()
-		clusterresource.Metadata.Name = interregator.GetClusterId()
-		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
-			LastSeen: time.Now(),
-			Versions: map[string]string{
-				"RorAgent": rorversion.GetRorVersion().Version,
-			},
-		}
+	} else {
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.LastSeen = time.Now()
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions = getVersions(hintsData)
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Urls = getUrls(agentclient)
 	}
 
 	//stringhelper.PrettyprintStruct(clusterresource)
@@ -111,6 +124,173 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	return nil
 }
 
+func getUrls(agentclient clusteragentclient.RorAgentClientInterface) map[string]string {
+	hasIngress, hasHTTPRoute := discoverRouteAPIs(agentclient)
+	return map[string]string{
+		"Argocd":  getUrl(agentclient, "argocd", "argocd-server", hasIngress, hasHTTPRoute),
+		"Grafana": getUrl(agentclient, "prometheus-operator", "grafana-helsenett", hasIngress, hasHTTPRoute),
+	}
+}
+
+// discoverRouteAPIs checks whether networking.k8s.io/v1 Ingress and
+// gateway.networking.k8s.io/v1 HTTPRoute APIs are available in the cluster.
+func discoverRouteAPIs(agentclient clusteragentclient.RorAgentClientInterface) (hasIngress bool, hasHTTPRoute bool) {
+	disco, err := agentclient.GetKubernetesClientset().GetDiscoveryClient()
+	if err != nil {
+		return false, false
+	}
+
+	if resources, err := disco.ServerResourcesForGroupVersion("networking.k8s.io/v1"); err == nil {
+		for _, r := range resources.APIResources {
+			if r.Kind == "Ingress" {
+				hasIngress = true
+				break
+			}
+		}
+	}
+
+	if resources, err := disco.ServerResourcesForGroupVersion("gateway.networking.k8s.io/v1"); err == nil {
+		for _, r := range resources.APIResources {
+			if r.Kind == "HTTPRoute" {
+				hasHTTPRoute = true
+				break
+			}
+		}
+	}
+
+	return hasIngress, hasHTTPRoute
+}
+
+func getUrl(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string, hasIngress bool, hasHTTPRoute bool) string {
+	if hasIngress {
+		if url := getUrlFromIngress(agentclient, namespace, name); url != "" {
+			return url
+		}
+	}
+	if hasHTTPRoute {
+		if url := getUrlFromHTTPRoute(agentclient, namespace, name); url != "" {
+			return url
+		}
+	}
+	return ""
+}
+
+func getUrlFromIngress(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string) string {
+	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
+	if err != nil {
+		return ""
+	}
+	ingress, err := client.NetworkingV1().Ingresses(namespace).Get(context.TODO(), name, v1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+	// Prefer TLS host
+	for _, tls := range ingress.Spec.TLS {
+		if len(tls.Hosts) > 0 {
+			return "https://" + tls.Hosts[0]
+		}
+	}
+	// Fall back to rule host
+	for _, rule := range ingress.Spec.Rules {
+		if rule.Host != "" {
+			return "https://" + rule.Host
+		}
+	}
+	return ""
+}
+
+func getUrlFromHTTPRoute(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string) string {
+	dynClient, err := agentclient.GetKubernetesClientset().GetDynamicClient()
+	if err != nil {
+		return ""
+	}
+	gvr := schema.GroupVersionResource{
+		Group:    "gateway.networking.k8s.io",
+		Version:  "v1",
+		Resource: "httproutes",
+	}
+	route, err := dynClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, v1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+	hostnames, found, err := unstructured.NestedStringSlice(route.Object, "spec", "hostnames")
+	if err != nil || !found || len(hostnames) == 0 {
+		return ""
+	}
+	return "https://" + hostnames[0]
+}
+
+func getCreatedTime(agentclient clusteragentclient.RorAgentClientInterface) time.Time {
+	// get the kube-system namespace creation time, as a proxy for cluster creation time, as the agent will be deployed shortly after cluster creation
+	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
+	if err != nil {
+		rlog.Warn("could not get kubernetes clientset to get cluster creation time")
+		return time.Time{}
+	}
+	namespace, err := client.CoreV1().Namespaces().Get(context.TODO(), "kube-system", v1.GetOptions{})
+	if err != nil {
+		rlog.Warn("could not get kube-system namespace to get cluster creation time")
+		return time.Time{}
+	}
+	return namespace.CreationTimestamp.Time
+}
+
+func getVersions(hintsData map[string]string) map[string]string {
+	return map[string]string{
+		"RorAgent":   rorversion.GetRorVersion().Version,
+		"NhnTooling": getConfigMapValue(hintsData, "toolingVersion", "Unknown"),
+	}
+}
+
+func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.KubernetesClusterAgentStatusNodes {
+	interregator := agentclient.GetClusterInterregator()
+	nodes := interregator.Nodes().Get()
+
+	nodepoolMap := make(map[string][]rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes)
+	var controlPlane []rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes
+
+	for _, node := range nodes {
+		cpuQuantity := node.Status.Capacity["cpu"]
+		memoryQuantity := node.Status.Capacity["memory"]
+
+		nodeInfo := rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes{
+			Name:              node.Name,
+			Cpu:               int(cpuQuantity.Value()),
+			Memory:            memoryQuantity.Value(),
+			Architecture:      node.Status.NodeInfo.Architecture,
+			KubernetesVersion: node.Status.NodeInfo.KubeletVersion,
+		}
+
+		if _, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]; isControlPlane {
+			controlPlane = append(controlPlane, nodeInfo)
+			continue
+		}
+
+		poolName := node.Labels["topology.kubernetes.io/zone"]
+		if np, ok := node.Labels["node.kubernetes.io/nodepool"]; ok {
+			poolName = np
+		}
+		if poolName == "" {
+			poolName = "default"
+		}
+
+		nodepoolMap[poolName] = append(nodepoolMap[poolName], nodeInfo)
+	}
+
+	var nodepools []rortypes.KubernetesClusterAgentStatusNodesNodepools
+	for name, poolNodes := range nodepoolMap {
+		nodepools = append(nodepools, rortypes.KubernetesClusterAgentStatusNodesNodepools{
+			Name:  name,
+			Nodes: poolNodes,
+		})
+	}
+
+	return rortypes.KubernetesClusterAgentStatusNodes{
+		ControllPlane: controlPlane,
+		Nodepools:     nodepools,
+	}
+}
+
 const (
 	hintsConfigmap = "nhn-tooling"
 )
@@ -118,38 +298,44 @@ const (
 // getEnvironment determines the environment of the cluster based on the interregator's GetEnvironment method.
 // If the interregator returns a known environment, it will try to get a configmap/key
 // lastly it will guestimate the environment based on the cluster name, region and az, using a simple heuristic.
-func getEnvironment(agentclient clusteragentclient.RorAgentClientInterface, interregator interregatortypes.ClusterInterregator) string {
+func getEnvironment(agentclient clusteragentclient.RorAgentClientInterface, hintsData map[string]string) string {
+	interregator := agentclient.GetClusterInterregator()
 	interregatorEnv := interregator.GetEnvironment()
 	if interregatorEnv != providermodels.UNKNOWN_UNDEFINED && interregatorEnv != providermodels.UNKNOWN_ENVIRONMENT {
 		return interregatorEnv
 	}
-	cmEnv := getEnvironmentFromConfigMap(agentclient)
-	if cmEnv != providermodels.UNKNOWN_ENVIRONMENT {
-		return cmEnv
+
+	if env := getConfigMapValue(hintsData, "environment", ""); env != "" {
+		return env
 	}
 
 	return guessEnvironment(interregator.GetClusterName())
 }
 
-func getEnvironmentFromConfigMap(agentclient clusteragentclient.RorAgentClientInterface) string {
-	// Try to get environment from configmap
+// getHintsConfigMap fetches the nhn-tooling configmap, returning nil if unavailable.
+func getHintsConfigMap(agentclient clusteragentclient.RorAgentClientInterface) map[string]string {
 	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
 	if err != nil {
-		rlog.Warn("could not get kubernetes clientset to get configmap, falling back to heuristic", rlog.String("configmap", hintsConfigmap))
-		return providermodels.UNKNOWN_ENVIRONMENT
+		rlog.Warn("could not get kubernetes clientset to get configmap", rlog.String("configmap", hintsConfigmap))
+		return nil
 	}
-
 	cm, err := client.CoreV1().ConfigMaps(rorconfig.GetString(rorconfig.POD_NAMESPACE)).Get(context.TODO(), hintsConfigmap, v1.GetOptions{})
 	if err != nil {
-		rlog.Warn("could not get configmap for environment hints, falling back to heuristic", rlog.String("configmap", hintsConfigmap), rlog.String("namespace", rorconfig.GetString(rorconfig.POD_NAMESPACE)))
-		return providermodels.UNKNOWN_ENVIRONMENT
+		rlog.Warn("could not get configmap", rlog.String("configmap", hintsConfigmap), rlog.String("namespace", rorconfig.GetString(rorconfig.POD_NAMESPACE)))
+		return nil
 	}
-	env, ok := cm.Data["environment"]
-	if !ok {
-		rlog.Warn("configmap for environment hints did not contain 'environment' key, falling back to heuristic", rlog.String("configmap", hintsConfigmap))
-		return providermodels.UNKNOWN_ENVIRONMENT
+	return cm.Data
+}
+
+// getConfigMapValue returns the value for a key from a configmap data map, or fallback if missing.
+func getConfigMapValue(data map[string]string, key string, fallback string) string {
+	if data == nil {
+		return fallback
 	}
-	return env
+	if val, ok := data[key]; ok {
+		return val
+	}
+	return fallback
 }
 
 func guessEnvironment(clusterName string) string {

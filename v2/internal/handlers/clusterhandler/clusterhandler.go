@@ -15,6 +15,8 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
 	"github.com/google/uuid"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -105,10 +107,12 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 			Nodes:              getNodes(agentclient),
 			LastSeen:           time.Now(),
 			CreatedAt:          getCreatedTime(agentclient),
+			Urls:               getUrls(agentclient),
 		}
 	} else {
 		clusterresource.KubernetesClusterResource.Status.AgentStatus.LastSeen = time.Now()
 		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions = getVersions(hintsData)
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Urls = getUrls(agentclient)
 	}
 
 	//stringhelper.PrettyprintStruct(clusterresource)
@@ -118,6 +122,102 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	resourceCacheInterface.AddResource(clusterresource)
 
 	return nil
+}
+
+func getUrls(agentclient clusteragentclient.RorAgentClientInterface) map[string]string {
+	hasIngress, hasHTTPRoute := discoverRouteAPIs(agentclient)
+	return map[string]string{
+		"Argocd":  getUrl(agentclient, "argocd", "argocd-server", hasIngress, hasHTTPRoute),
+		"Grafana": getUrl(agentclient, "prometheus-operator", "grafana-helsenett", hasIngress, hasHTTPRoute),
+	}
+}
+
+// discoverRouteAPIs checks whether networking.k8s.io/v1 Ingress and
+// gateway.networking.k8s.io/v1 HTTPRoute APIs are available in the cluster.
+func discoverRouteAPIs(agentclient clusteragentclient.RorAgentClientInterface) (hasIngress bool, hasHTTPRoute bool) {
+	disco, err := agentclient.GetKubernetesClientset().GetDiscoveryClient()
+	if err != nil {
+		return false, false
+	}
+
+	if resources, err := disco.ServerResourcesForGroupVersion("networking.k8s.io/v1"); err == nil {
+		for _, r := range resources.APIResources {
+			if r.Kind == "Ingress" {
+				hasIngress = true
+				break
+			}
+		}
+	}
+
+	if resources, err := disco.ServerResourcesForGroupVersion("gateway.networking.k8s.io/v1"); err == nil {
+		for _, r := range resources.APIResources {
+			if r.Kind == "HTTPRoute" {
+				hasHTTPRoute = true
+				break
+			}
+		}
+	}
+
+	return hasIngress, hasHTTPRoute
+}
+
+func getUrl(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string, hasIngress bool, hasHTTPRoute bool) string {
+	if hasIngress {
+		if url := getUrlFromIngress(agentclient, namespace, name); url != "" {
+			return url
+		}
+	}
+	if hasHTTPRoute {
+		if url := getUrlFromHTTPRoute(agentclient, namespace, name); url != "" {
+			return url
+		}
+	}
+	return ""
+}
+
+func getUrlFromIngress(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string) string {
+	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
+	if err != nil {
+		return ""
+	}
+	ingress, err := client.NetworkingV1().Ingresses(namespace).Get(context.TODO(), name, v1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+	// Prefer TLS host
+	for _, tls := range ingress.Spec.TLS {
+		if len(tls.Hosts) > 0 {
+			return "https://" + tls.Hosts[0]
+		}
+	}
+	// Fall back to rule host
+	for _, rule := range ingress.Spec.Rules {
+		if rule.Host != "" {
+			return "https://" + rule.Host
+		}
+	}
+	return ""
+}
+
+func getUrlFromHTTPRoute(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string) string {
+	dynClient, err := agentclient.GetKubernetesClientset().GetDynamicClient()
+	if err != nil {
+		return ""
+	}
+	gvr := schema.GroupVersionResource{
+		Group:    "gateway.networking.k8s.io",
+		Version:  "v1",
+		Resource: "httproutes",
+	}
+	route, err := dynClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, v1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+	hostnames, found, err := unstructured.NestedStringSlice(route.Object, "spec", "hostnames")
+	if err != nil || !found || len(hostnames) == 0 {
+		return ""
+	}
+	return "https://" + hostnames[0]
 }
 
 func getCreatedTime(agentclient clusteragentclient.RorAgentClientInterface) time.Time {

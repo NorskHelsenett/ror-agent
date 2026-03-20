@@ -9,7 +9,6 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
-	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v2"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources"
@@ -89,6 +88,8 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	clusterresource.RorMeta.LastReported = time.Now().String()
 	clusterresource.Metadata.Name = interregator.GetClusterId()
 
+	hintsData := getHintsConfigMap(agentclient)
+
 	if needsFullUpdate {
 		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
 			ClusterId:          agentclient.GetClusterId(),
@@ -99,18 +100,15 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 			Country:            interregator.GetCountry(),
 			Workspace:          interregator.GetClusterWorkspace(),
 			Datacenter:         interregator.GetDatacenter(),
-			Environment:        getEnvironment(agentclient, interregator),
-			Versions: map[string]string{
-				"RorAgent": rorversion.GetRorVersion().Version,
-			},
-			Nodes:    getNodes(agentclient),
-			LastSeen: time.Now(),
+			Environment:        getEnvironment(agentclient, hintsData),
+			Versions:           getVersions(hintsData),
+			Nodes:              getNodes(agentclient),
+			LastSeen:           time.Now(),
+			CreatedAt:          getCreatedTime(agentclient),
 		}
 	} else {
 		clusterresource.KubernetesClusterResource.Status.AgentStatus.LastSeen = time.Now()
-		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions = map[string]string{
-			"RorAgent": rorversion.GetRorVersion().Version,
-		}
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions = getVersions(hintsData)
 	}
 
 	//stringhelper.PrettyprintStruct(clusterresource)
@@ -120,6 +118,28 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	resourceCacheInterface.AddResource(clusterresource)
 
 	return nil
+}
+
+func getCreatedTime(agentclient clusteragentclient.RorAgentClientInterface) time.Time {
+	// get the kube-system namespace creation time, as a proxy for cluster creation time, as the agent will be deployed shortly after cluster creation
+	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
+	if err != nil {
+		rlog.Warn("could not get kubernetes clientset to get cluster creation time")
+		return time.Time{}
+	}
+	namespace, err := client.CoreV1().Namespaces().Get(context.TODO(), "kube-system", v1.GetOptions{})
+	if err != nil {
+		rlog.Warn("could not get kube-system namespace to get cluster creation time")
+		return time.Time{}
+	}
+	return namespace.CreationTimestamp.Time
+}
+
+func getVersions(hintsData map[string]string) map[string]string {
+	return map[string]string{
+		"RorAgent":   rorversion.GetRorVersion().Version,
+		"NhnTooling": getConfigMapValue(hintsData, "toolingVersion", "Unknown"),
+	}
 }
 
 func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.KubernetesClusterAgentStatusNodes {
@@ -178,38 +198,44 @@ const (
 // getEnvironment determines the environment of the cluster based on the interregator's GetEnvironment method.
 // If the interregator returns a known environment, it will try to get a configmap/key
 // lastly it will guestimate the environment based on the cluster name, region and az, using a simple heuristic.
-func getEnvironment(agentclient clusteragentclient.RorAgentClientInterface, interregator interregatortypes.ClusterInterregator) string {
+func getEnvironment(agentclient clusteragentclient.RorAgentClientInterface, hintsData map[string]string) string {
+	interregator := agentclient.GetClusterInterregator()
 	interregatorEnv := interregator.GetEnvironment()
 	if interregatorEnv != providermodels.UNKNOWN_UNDEFINED && interregatorEnv != providermodels.UNKNOWN_ENVIRONMENT {
 		return interregatorEnv
 	}
-	cmEnv := getEnvironmentFromConfigMap(agentclient)
-	if cmEnv != providermodels.UNKNOWN_ENVIRONMENT {
-		return cmEnv
+
+	if env := getConfigMapValue(hintsData, "environment", ""); env != "" {
+		return env
 	}
 
 	return guessEnvironment(interregator.GetClusterName())
 }
 
-func getEnvironmentFromConfigMap(agentclient clusteragentclient.RorAgentClientInterface) string {
-	// Try to get environment from configmap
+// getHintsConfigMap fetches the nhn-tooling configmap, returning nil if unavailable.
+func getHintsConfigMap(agentclient clusteragentclient.RorAgentClientInterface) map[string]string {
 	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
 	if err != nil {
-		rlog.Warn("could not get kubernetes clientset to get configmap, falling back to heuristic", rlog.String("configmap", hintsConfigmap))
-		return providermodels.UNKNOWN_ENVIRONMENT
+		rlog.Warn("could not get kubernetes clientset to get configmap", rlog.String("configmap", hintsConfigmap))
+		return nil
 	}
-
 	cm, err := client.CoreV1().ConfigMaps(rorconfig.GetString(rorconfig.POD_NAMESPACE)).Get(context.TODO(), hintsConfigmap, v1.GetOptions{})
 	if err != nil {
-		rlog.Warn("could not get configmap for environment hints, falling back to heuristic", rlog.String("configmap", hintsConfigmap), rlog.String("namespace", rorconfig.GetString(rorconfig.POD_NAMESPACE)))
-		return providermodels.UNKNOWN_ENVIRONMENT
+		rlog.Warn("could not get configmap", rlog.String("configmap", hintsConfigmap), rlog.String("namespace", rorconfig.GetString(rorconfig.POD_NAMESPACE)))
+		return nil
 	}
-	env, ok := cm.Data["environment"]
-	if !ok {
-		rlog.Warn("configmap for environment hints did not contain 'environment' key, falling back to heuristic", rlog.String("configmap", hintsConfigmap))
-		return providermodels.UNKNOWN_ENVIRONMENT
+	return cm.Data
+}
+
+// getConfigMapValue returns the value for a key from a configmap data map, or fallback if missing.
+func getConfigMapValue(data map[string]string, key string, fallback string) string {
+	if data == nil {
+		return fallback
 	}
-	return env
+	if val, ok := data[key]; ok {
+		return val
+	}
+	return fallback
 }
 
 func guessEnvironment(clusterName string) string {

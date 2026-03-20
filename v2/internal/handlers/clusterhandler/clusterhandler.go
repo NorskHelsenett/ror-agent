@@ -96,6 +96,9 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		clusterresource.Metadata.Name = interregator.GetClusterId()
 		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
 			LastSeen: time.Now(),
+			Versions: map[string]string{
+				"RorAgent": rorversion.GetRorVersion().Version,
+			},
 		}
 	}
 

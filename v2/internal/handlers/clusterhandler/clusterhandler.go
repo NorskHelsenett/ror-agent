@@ -250,13 +250,10 @@ func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.K
 	var controlPlane []rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes
 
 	for _, node := range nodes {
-		cpuQuantity := node.Status.Capacity["cpu"]
-		memoryQuantity := node.Status.Capacity["memory"]
-
 		nodeInfo := rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes{
 			Name:              node.Name,
-			Cpu:               int(cpuQuantity.Value()),
-			Memory:            memoryQuantity.Value(),
+			Cpu:               rortypes.Quantity{Quantity: node.Status.Capacity["cpu"]},
+			Memory:            rortypes.Quantity{Quantity: node.Status.Capacity["memory"]},
 			Architecture:      node.Status.NodeInfo.Architecture,
 			KubernetesVersion: node.Status.NodeInfo.KubeletVersion,
 		}

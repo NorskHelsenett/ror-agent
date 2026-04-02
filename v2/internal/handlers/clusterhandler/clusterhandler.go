@@ -113,6 +113,7 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		clusterresource.KubernetesClusterResource.Status.AgentStatus.LastSeen = time.Now()
 		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions = getVersions(hintsData)
 		clusterresource.KubernetesClusterResource.Status.AgentStatus.Urls = getUrls(agentclient)
+		clusterresource.KubernetesClusterResource.Status.AgentStatus.Nodes = getNodes(agentclient)
 	}
 
 	//stringhelper.PrettyprintStruct(clusterresource)
@@ -246,16 +247,27 @@ func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.K
 	interregator := agentclient.GetClusterInterregator()
 	nodes := interregator.Nodes().Get()
 
+	nodeMetricsMap := getNodeMetricsMap(agentclient)
+
 	nodepoolMap := make(map[string][]rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes)
 	var controlPlane []rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes
 
 	for _, node := range nodes {
 		nodeInfo := rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodes{
-			Name:              node.Name,
-			Cpu:               rortypes.Quantity{Quantity: node.Status.Capacity["cpu"]},
-			Memory:            rortypes.Quantity{Quantity: node.Status.Capacity["memory"]},
+			Name: node.Name,
+			Cpu: rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodesResource{
+				Capacity: rortypes.Quantity{Quantity: node.Status.Capacity["cpu"]},
+			},
+			Memory: rortypes.KubernetesClusterAgentStatusNodesNodepoolsNodesResource{
+				Capacity: rortypes.Quantity{Quantity: node.Status.Capacity["memory"]},
+			},
 			Architecture:      node.Status.NodeInfo.Architecture,
 			KubernetesVersion: node.Status.NodeInfo.KubeletVersion,
+		}
+
+		if usage, ok := nodeMetricsMap[node.Name]; ok {
+			nodeInfo.Cpu.Used = usage.cpu
+			nodeInfo.Memory.Used = usage.memory
 		}
 
 		if _, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]; isControlPlane {
@@ -286,6 +298,32 @@ func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.K
 		ControllPlane: controlPlane,
 		Nodepools:     nodepools,
 	}
+}
+
+type nodeMetricsUsage struct {
+	cpu    rortypes.Quantity
+	memory rortypes.Quantity
+}
+
+func getNodeMetricsMap(agentclient clusteragentclient.RorAgentClientInterface) map[string]nodeMetricsUsage {
+	metricsClient, err := agentclient.GetKubernetesClientset().GetMetricsV1Beta1Client()
+	if err != nil {
+		rlog.Warn("could not get metrics client, node usage will not be reported")
+		return nil
+	}
+	nodeMetrics, err := metricsClient.NodeMetricses().List(context.TODO(), v1.ListOptions{})
+	if err != nil {
+		rlog.Warn("could not list node metrics, node usage will not be reported")
+		return nil
+	}
+	result := make(map[string]nodeMetricsUsage, len(nodeMetrics.Items))
+	for _, m := range nodeMetrics.Items {
+		result[m.Name] = nodeMetricsUsage{
+			cpu:    rortypes.Quantity{Quantity: *m.Usage.Cpu()},
+			memory: rortypes.Quantity{Quantity: *m.Usage.Memory()},
+		}
+	}
+	return result
 }
 
 const (

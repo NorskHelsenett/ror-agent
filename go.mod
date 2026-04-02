@@ -3,12 +3,12 @@ module github.com/NorskHelsenett/ror-agent
 go 1.26.1
 
 require (
-	github.com/NorskHelsenett/ror v1.17.10
-	github.com/NorskHelsenett/ror-agent/common v1.0.3
+	github.com/NorskHelsenett/ror v1.17.11
+	github.com/NorskHelsenett/ror-agent/common v1.0.4
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/go-cmp v0.7.0
 	github.com/stretchr/testify v1.11.1
-	github.com/vitistack/common v0.8.50
+	github.com/vitistack/common v0.8.54
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
@@ -25,7 +25,7 @@ require (
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-http-utils/headers v0.0.0-20181008091004-fed159eddc2a // indirect
 	github.com/go-http-utils/negotiator v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -120,7 +120,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9 // indirect
+	k8s.io/kube-openapi v0.0.0-20260330154417-16be699c7b31 // indirect
 	k8s.io/metrics v0.35.3 // indirect
 	sigs.k8s.io/controller-runtime v0.23.3 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect

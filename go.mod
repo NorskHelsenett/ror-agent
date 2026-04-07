@@ -3,7 +3,7 @@ module github.com/NorskHelsenett/ror-agent
 go 1.26.1
 
 require (
-	github.com/NorskHelsenett/ror v1.17.11
+	github.com/NorskHelsenett/ror v1.18.1
 	github.com/NorskHelsenett/ror-agent/common v1.0.4
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/go-cmp v0.7.0

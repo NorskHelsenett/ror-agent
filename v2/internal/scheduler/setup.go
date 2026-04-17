@@ -13,9 +13,9 @@ func SetUpScheduler(rorAgentClientInterface clusteragentclient.RorAgentClientInt
 	rlog.Info("Starting schedulers")
 	scheduler := gocron.NewScheduler(time.UTC)
 	_, err := scheduler.Every(5).Minutes().StartImmediately().Tag("node-exporter").Do(NodeExporterReporting, rorAgentClientInterface)
+
 	if err != nil {
-		rlog.Fatal("Could not setup scheduler for metrics", err)
-		return
+		rlog.Error("Could not setup scheduler for node-exporter metrics", err)
 	}
-	//scheduler.StartAsync()
+	scheduler.StartAsync()
 }

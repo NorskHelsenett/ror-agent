@@ -1,7 +1,7 @@
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/NorskHelsenett/ror v1.18.4 h1:2U4r7O/d7+X3Y1duusPW5YMto1mDtmYEPTl8dQp5p+4=
-github.com/NorskHelsenett/ror v1.18.4/go.mod h1:A7DKqQZJ5MWG0HW9sVHcqlxGazEpZjFD4rGotxzZAtk=
+github.com/NorskHelsenett/ror v1.18.5 h1:7+W31YDwkLOu09d8IDXeJS2j6k2vpX/t05TvAmHh9F0=
+github.com/NorskHelsenett/ror v1.18.5/go.mod h1:E5ar/WqMxUFPurNfRGPlMC0nU5l6l6Yp0Lnkc977H2o=
 github.com/NorskHelsenett/ror-agent/common v1.0.4 h1:LVa0p+NrSmRtNXvaI1Ce77LOfi5v1T2LX01DS1HnwRk=
 github.com/NorskHelsenett/ror-agent/common v1.0.4/go.mod h1:i8+wKIlM1NE2bhmpyMHKq1oSxYA1/HArftpAvf9n6vQ=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=

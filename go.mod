@@ -3,8 +3,8 @@ module github.com/NorskHelsenett/ror-agent
 go 1.26.2
 
 require (
-	github.com/NorskHelsenett/ror v1.18.4
-	github.com/NorskHelsenett/ror-agent/common v1.0.4
+	github.com/NorskHelsenett/ror v1.18.5
+	github.com/NorskHelsenett/ror-agent/common v1.0.5
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/go-cmp v0.7.0
 	github.com/stretchr/testify v1.11.1
@@ -12,7 +12,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
-	k8s.io/client-go v0.35.3
+	k8s.io/client-go v0.35.4
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 )
 

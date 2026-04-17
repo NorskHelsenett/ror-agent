@@ -16,9 +16,6 @@ func MustStart(rorClientInterface clusteragentclient.RorAgentClientInterface) {
 		rlog.Fatal("Failed to setup heartbeat schedule", err)
 	}
 
-	_, err = scheduler.Every(1).Minute().Tag("metrics").Do(MetricsReporting, rorClientInterface)
-	if err != nil {
-		rlog.Fatal("Failed to setup metric schedule", err)
-	}
+	// Metrics reporting is handled by agent v2
 	scheduler.StartAsync()
 }

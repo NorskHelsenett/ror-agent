@@ -45,7 +45,6 @@ type RorAgentClientInterface interface {
 
 	GetSigs() chan os.Signal
 	GetStopChan() chan struct{}
-	GetClusterId() string
 	PingRorAPI() error
 
 	interregatortypes.ClusterInterregator

@@ -47,6 +47,8 @@ type RorAgentClientInterface interface {
 	GetStopChan() chan struct{}
 	GetClusterId() string
 	PingRorAPI() error
+
+	interregatortypes.ClusterInterregator
 }
 
 type RorAgentClientConfig struct {
@@ -439,4 +441,43 @@ func (r *rorAgentClient) GetClusterInterregator() interregatortypes.ClusterInter
 
 func (r *rorAgentClient) GetClusterId() string {
 	return r.config.identifier
+}
+
+func (r *rorAgentClient) GetProvider() providermodels.ProviderType {
+	return r.config.interregator.GetProvider()
+}
+
+func (r *rorAgentClient) GetClusterName() string {
+	return r.config.interregator.GetClusterName()
+}
+
+func (r *rorAgentClient) GetClusterWorkspace() string {
+	return r.config.interregator.GetClusterWorkspace()
+}
+
+func (r *rorAgentClient) GetAz() string {
+	return r.config.interregator.GetAz()
+}
+
+func (r *rorAgentClient) GetDatacenter() string {
+	return r.config.interregator.GetDatacenter()
+}
+
+func (r *rorAgentClient) GetRegion() string {
+	return r.config.interregator.GetRegion()
+}
+func (r *rorAgentClient) GetMachineProvider() providermodels.ProviderType {
+	return r.config.interregator.GetMachineProvider()
+}
+func (r *rorAgentClient) GetKubernetesProvider() providermodels.ProviderType {
+	return r.config.interregator.GetKubernetesProvider()
+}
+func (r *rorAgentClient) GetCountry() string {
+	return r.config.interregator.GetCountry()
+}
+func (r *rorAgentClient) Nodes() interregatortypes.ClusterNodeReport {
+	return r.config.interregator.Nodes()
+}
+func (r *rorAgentClient) GetEnvironment() string {
+	return r.config.interregator.GetEnvironment()
 }

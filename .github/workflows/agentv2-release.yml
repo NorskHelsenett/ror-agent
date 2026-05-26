@@ -18,7 +18,7 @@ jobs:
       shortsha: ${{ steps.env.outputs.SHA_SHORT }}
       libver: ${{ steps.env.outputs.LIB_VER }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - id: env
         name: Set env
         run: |
@@ -32,11 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: setenv
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.25'
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
     - name: Start build
       run: |
         echo "Building ${{ env.APP }} ${{ needs.setenv.outputs.rorversion}} (${{ needs.setenv.outputs.shortsha}})"
@@ -70,7 +72,7 @@ jobs:
       image-tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Download binary build artifacts
         uses: actions/download-artifact@v4
       - name: Check env
@@ -131,7 +133,7 @@ jobs:
       - setenv
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Check env
         run: |
           echo "Building helm chart for ${{ env.APP }} ${{ needs.setenv.outputs.rorversion }} (${{ needs.setenv.outputs.shortsha}})"

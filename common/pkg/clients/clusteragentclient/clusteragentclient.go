@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apikeystypes/v2"
@@ -70,6 +71,8 @@ type rorAgentClient struct {
 	config       RorAgentClientConfig
 	stopChan     chan struct{}
 	sigs         chan os.Signal
+	egressOnce   sync.Once
+	egressIP     string
 }
 
 func GetDefaultRorAgentClientConfig() *RorAgentClientConfig {
@@ -494,12 +497,15 @@ func (r *rorAgentClient) GetKubernetesCA() string {
 }
 
 func (r *rorAgentClient) GetEgressIP() string {
-	egress, err := GetEgressIp([]string{"http://ip.nhn.no", "https://api.ipify.org/"})
-	if err != nil {
-		rlog.Error("failed to get egress IP, returning empty string", err)
-		return ""
-	}
-	return egress
+	r.egressOnce.Do(func() {
+		egress, err := GetEgressIp([]string{"http://ip.nhn.no", "https://api.ipify.org/"})
+		if err != nil {
+			rlog.Error("failed to get egress IP", err)
+			return
+		}
+		r.egressIP = egress
+	})
+	return r.egressIP
 }
 
 func GetEgressIp(urls []string) (string, error) {

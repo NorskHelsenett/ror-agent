@@ -130,7 +130,7 @@ func getEndpoints(agentclient clusteragentclient.RorAgentClientInterface) rortyp
 	return rortypes.KubernetesClusterAgentStatusEndpoint{
 		ApiServer: agentclient.GetClusterInterregator().GetKubernetesApiServer(),
 		CACert:    agentclient.GetClusterInterregator().GetKubernetesCA(),
-		EgressIp:  agentclient.GetEgressIP(), // Egress is not implemented yet, as it requires network calls and we want to avoid that in the cluster handler for now. It can be added later when we have a better understanding of the performance implications.
+		EgressIp:  agentclient.GetEgressIP(),
 	}
 }
 

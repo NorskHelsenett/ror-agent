@@ -62,7 +62,6 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	}
 
 	// Add cluster resource to workqueue to ensure it exists in the system and to trigger any logic related to it
-	interregator := agentclient.GetClusterInterregator()
 	var clusterresource *rorresources.Resource
 	if len(existing.Resources) == 0 {
 		clusterresource = rorresources.NewRorKubernetesClusterResource()
@@ -88,23 +87,24 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions["RorAgent"] != rorversion.GetRorVersion().Version
 
 	clusterresource.RorMeta.LastReported = time.Now().String()
-	clusterresource.Metadata.Name = interregator.GetClusterId()
+	clusterresource.Metadata.Name = agentclient.GetClusterId()
 
 	hintsData := getHintsConfigMap(agentclient)
 
 	if needsFullUpdate {
 		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
 			ClusterId:          agentclient.GetClusterId(),
-			ClusterName:        interregator.GetClusterName(),
-			KubernetesProvider: interregator.GetKubernetesProvider(),
-			Az:                 interregator.GetAz(),
-			Region:             interregator.GetRegion(),
-			Country:            interregator.GetCountry(),
-			Workspace:          interregator.GetClusterWorkspace(),
-			Datacenter:         interregator.GetDatacenter(),
+			ClusterName:        agentclient.GetClusterName(),
+			KubernetesProvider: agentclient.GetKubernetesProvider(),
+			Az:                 agentclient.GetAz(),
+			Region:             agentclient.GetRegion(),
+			Country:            agentclient.GetCountry(),
+			Workspace:          agentclient.GetClusterWorkspace(),
+			Datacenter:         agentclient.GetDatacenter(),
 			Environment:        getEnvironment(agentclient, hintsData),
 			Versions:           getVersions(hintsData),
 			Nodes:              getNodes(agentclient),
+			Endpoint:           getEndpoints(agentclient),
 			LastSeen:           time.Now(),
 			CreatedAt:          getCreatedTime(agentclient),
 			Urls:               getUrls(agentclient),
@@ -123,6 +123,15 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	resourceCacheInterface.AddResource(clusterresource)
 
 	return nil
+}
+
+func getEndpoints(agentclient clusteragentclient.RorAgentClientInterface) rortypes.KubernetesClusterAgentStatusEndpoint {
+
+	return rortypes.KubernetesClusterAgentStatusEndpoint{
+		ApiServer: agentclient.GetClusterInterregator().GetKubernetesApiServer(),
+		CACert:    agentclient.GetClusterInterregator().GetKubernetesCA(),
+		EgressIp:  agentclient.GetEgressIP(), // Egress is not implemented yet, as it requires network calls and we want to avoid that in the cluster handler for now. It can be added later when we have a better understanding of the performance implications.
+	}
 }
 
 func getUrls(agentclient clusteragentclient.RorAgentClientInterface) map[string]string {

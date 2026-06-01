@@ -19,8 +19,8 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/idhelper"
 	"github.com/NorskHelsenett/ror/pkg/helpers/rorhealth"
-	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v2"
-	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v2"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v3"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v3"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
@@ -479,4 +479,12 @@ func (r *rorAgentClient) Nodes() interregatortypes.ClusterNodeReport {
 }
 func (r *rorAgentClient) GetEnvironment() string {
 	return r.config.interregator.GetEnvironment()
+}
+
+func (r *rorAgentClient) GetKubernetesApiServer() string {
+	return r.config.interregator.GetKubernetesApiServer()
+}
+
+func (r *rorAgentClient) GetKubernetesCA() string {
+	return r.config.interregator.GetKubernetesCA()
 }

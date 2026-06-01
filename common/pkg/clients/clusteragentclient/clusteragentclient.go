@@ -4,8 +4,11 @@ package clusteragentclient
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apikeystypes/v2"
@@ -42,6 +45,7 @@ type RorAgentClientInterface interface {
 	GetRorClient() rorclient.RorClientInterface
 	GetKubernetesClientset() *kubernetesclient.K8sClientsets
 	GetClusterInterregator() interregatortypes.ClusterInterregator
+	GetEgressIP() string
 
 	GetSigs() chan os.Signal
 	GetStopChan() chan struct{}
@@ -487,4 +491,39 @@ func (r *rorAgentClient) GetKubernetesApiServer() string {
 
 func (r *rorAgentClient) GetKubernetesCA() string {
 	return r.config.interregator.GetKubernetesCA()
+}
+
+func (r *rorAgentClient) GetEgressIP() string {
+	egress, err := GetEgressIp([]string{"http://ip.nhn.no", "https://api.ipify.org/"})
+	if err != nil {
+		rlog.Error("failed to get egress IP, returning empty string", err)
+		return ""
+	}
+	return egress
+}
+
+func GetEgressIp(urls []string) (string, error) {
+	for _, apiHost := range urls {
+		rlog.Info("Resolving ip", rlog.String("api host", apiHost))
+		res, err := http.Get(apiHost)
+		if err != nil {
+			rlog.Info("could not reach host", rlog.String("host", apiHost), rlog.Any("error", err))
+			continue
+		}
+
+		body, err := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if res.StatusCode > 299 {
+			rlog.Info("response failed", rlog.Int("status code", res.StatusCode), rlog.ByteString("body", body))
+			continue
+		}
+
+		if err != nil {
+			rlog.Error("could not parse body", err)
+			continue
+		}
+
+		return strings.TrimSpace(string(body)), nil
+	}
+	return "", fmt.Errorf("could not resolve egress IP from any of the provided URLs")
 }

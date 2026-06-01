@@ -1,4 +1,4 @@
-name: Build Cluster Agent Common library
+name: Build and test Cluster Agent Common library
 on:
   pull_request:
     branches:

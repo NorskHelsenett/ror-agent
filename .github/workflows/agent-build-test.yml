@@ -1,4 +1,4 @@
-name: Build Cluster Agent v1
+name: Build and test Cluster Agent v1
 on:
   pull_request:
     branches:

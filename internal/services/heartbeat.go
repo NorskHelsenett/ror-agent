@@ -20,7 +20,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/kubernetes/metadatahelper"
-	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/providerinterregationreport"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/providerinterregationreport/v3"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"

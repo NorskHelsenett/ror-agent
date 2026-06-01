@@ -1,10 +1,11 @@
-name: Build Cluster Agent v1
+name: Build and test Cluster Agent v1
 on:
   pull_request:
     branches:
       - main
     paths-ignore:
       - 'v2/**'
+      - 'common/**'
       - '.github/workflows/agentv2.yml'
       - 'charts/ror-cluster-agent-v2/**'
 env:

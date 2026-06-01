@@ -1,0 +1,33 @@
+name: Build and test Cluster Agent Common library
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - common/**
+jobs:
+  build-app:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+    - name: Test
+      run: |
+          echo testing...
+          cd common
+          go get -t ./...
+          go vet ./...
+          go test -v ./...
+    - name: Build
+      run: |
+        echo building common...
+        cd common
+        go get ./...
+        CGO_ENABLED=0 go build -ldflags "-w -extldflags '-static'"  ./...

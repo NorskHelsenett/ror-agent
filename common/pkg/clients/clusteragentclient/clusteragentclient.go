@@ -149,12 +149,21 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 		return nil, err
 	}
 
-	rlog.Info("connected to ror-api", rlog.String("version", ver), rlog.String("clusterid", selfdata.User.Name))
+	rlog.Info("connected to ror-api", rlog.String("version", ver), rlog.String("clusterid", selfdata.User.Name), rlog.String("uid", selfdata.User.Uid))
 	client.rorAPIClient.SetOwnerref(rorresourceowner.RorResourceOwnerReference{
 		Scope:   aclmodels.Acl2ScopeCluster,
 		Subject: aclmodels.Acl2Subject(selfdata.User.Name),
 	})
 	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.User.Name)
+	if selfdata.User.Uid != "" {
+		rorconfig.Set(configconsts.CLUSTER_UID, selfdata.User.Uid)
+	}
+
+	// Persist UID to secret so it's available on restart without an API call
+	if selfdata.User.Uid != "" {
+		_ = client.kubernetesUpdateOrCreateApiKeySecret()
+	}
+
 	rorhealth.Register(context.TODO(), "rorAPI", client.rorAPIClient)
 
 	return client, nil
@@ -326,6 +335,10 @@ func (r *rorAgentClient) kubernetesUpdateOrCreateApiKeySecret() error {
 		secret.Data["CLUSTER_ID"] = []byte(r.config.identifier)
 		hasChanged = true
 	}
+	if uid := rorconfig.GetString(configconsts.CLUSTER_UID); uid != "" && string(secret.Data["CLUSTER_UID"]) != uid {
+		secret.Data["CLUSTER_UID"] = []byte(uid)
+		hasChanged = true
+	}
 	if !hasChanged {
 		return nil
 	}
@@ -363,6 +376,9 @@ func (r *rorAgentClient) getClusterAuthFromSecret() error {
 	r.config.apiKey = string(secret.Data["APIKEY"])
 	if r.config.apiKey == "" {
 		r.config.apiKey = UNKNOWN_API_KEY
+	}
+	if uid := string(secret.Data["CLUSTER_UID"]); uid != "" {
+		rorconfig.Set(configconsts.CLUSTER_UID, uid)
 	}
 	return nil
 }

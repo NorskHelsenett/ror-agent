@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
+	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
+	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
+	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources"
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
@@ -28,7 +31,7 @@ func MustStart(agentclient clusteragentclient.RorAgentClientInterface, resourceC
 }
 
 func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
-	rlog.Info("Starting cluster handler", rlog.String("clusterid", agentclient.GetClusterInterregator().GetClusterId()))
+	rlog.Info("Starting cluster handler", rlog.String("clusterid", agentclient.GetClusterId()))
 
 	if err := updateClusterResource(agentclient, resourceCacheInterface); err != nil {
 		return err
@@ -80,7 +83,25 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	if len(existing.Resources) == 1 {
 		clusterresource = rorresources.NewResourceFromStruct(*existing.Resources[0])
 		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
+		// Update the KubernetesCluster ownerref to UID on subsequent runs
+		clusterresource.RorMeta.Ownerref = rorresourceowner.RorResourceOwnerReference{
+			Scope:   aclmodels.Acl2ScopeCluster,
+			Subject: aclmodels.Acl2Subject(string(clusterresource.Metadata.UID)),
+		}
 	}
+
+	// Update ownerref subject to use the KubernetesCluster UID.
+	clusterUID := string(clusterresource.Metadata.UID)
+	rorconfig.Set(configconsts.CLUSTER_UID, clusterUID)
+
+	// Set the client ownerref to UID for all child resources.
+	// The KubernetesCluster resource keeps its original ownerref (clusterid on
+	// first creation, UID on subsequent updates) to avoid a bootstrap chicken-and-egg:
+	// on first registration the identity doesn't yet know the UID.
+	agentclient.GetRorClient().SetOwnerref(rorresourceowner.RorResourceOwnerReference{
+		Scope:   aclmodels.Acl2ScopeCluster,
+		Subject: aclmodels.Acl2Subject(clusterUID),
+	})
 
 	// Full update if resource is new or agent version changed, otherwise just update partial
 	needsFullUpdate := len(existing.Resources) == 0 ||
@@ -120,7 +141,21 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 
 	clusterresource.GenRorHash()
 
-	resourceCacheInterface.AddResource(clusterresource)
+	// On first registration (no existing resource), send the KubernetesCluster
+	// synchronously so it is persisted before dynamic watchers start queuing
+	// child resources. This prevents the race condition where child resources
+	// arrive before the API knows the cluster UID, resulting in 403 errors.
+	if len(existing.Resources) == 0 {
+		rs := rorresources.NewResourceSet()
+		rs.Add(clusterresource)
+		_, err := agentclient.GetRorClient().V2().Resources().Update(context.TODO(), rs)
+		if err != nil {
+			return fmt.Errorf("failed to synchronously register KubernetesCluster resource: %w", err)
+		}
+		rlog.Info("KubernetesCluster resource registered synchronously", rlog.String("uid", clusterUID))
+	} else {
+		resourceCacheInterface.AddResource(clusterresource)
+	}
 
 	return nil
 }

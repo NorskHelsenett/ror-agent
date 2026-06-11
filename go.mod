@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/NorskHelsenett/ror v1.19.1
-	github.com/NorskHelsenett/ror-agent/common v1.0.11
+	github.com/NorskHelsenett/ror-agent/common v1.0.12
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/go-cmp v0.7.0
 	github.com/stretchr/testify v1.11.1

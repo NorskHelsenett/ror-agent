@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	vitiv1alpha1 "github.com/vitistack/common/pkg/v1alpha1"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
@@ -180,6 +181,12 @@ func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInte
 	} else {
 		created = kubeSystemNamespace.CreationTimestamp.Time
 	}
+	var uid string
+	if rorconfig.GetString(configconsts.CLUSTER_UID) != "" {
+		uid = rorconfig.GetString(configconsts.CLUSTER_UID)
+	} else {
+		uid = uuid.New().String()
+	}
 
 	report := apicontracts.Cluster{
 		ACL: apicontracts.AccessControlList{
@@ -187,6 +194,7 @@ func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInte
 		},
 		Environment: nhnToolingMetadata.Environment,
 		ClusterId:   rorconfig.GetString(configconsts.CLUSTER_ID),
+		Uid:         uid,
 		ClusterName: clusterName,
 		Ingresses:   ingresses,
 		Created:     created,

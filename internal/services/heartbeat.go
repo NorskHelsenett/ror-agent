@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	vitiv1alpha1 "github.com/vitistack/common/pkg/v1alpha1"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
@@ -17,8 +16,6 @@ import (
 	"github.com/NorskHelsenett/ror-agent/internal/kubernetes/nodeservice"
 	"github.com/NorskHelsenett/ror-agent/internal/utils"
 
-	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
-	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/kubernetes/metadatahelper"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/providerinterregationreport/v3"
@@ -181,19 +178,16 @@ func GetHeartbeatReport(rorClientInterface clusteragentclient.RorAgentClientInte
 	} else {
 		created = kubeSystemNamespace.CreationTimestamp.Time
 	}
-	var uid string
-	if rorconfig.GetString(configconsts.CLUSTER_UID) != "" {
-		uid = rorconfig.GetString(configconsts.CLUSTER_UID)
-	} else {
-		uid = uuid.New().String()
-	}
+	// The cluster uid and clusterid are owned and resolved by the agent client.
+	// The business logic only consumes them and must never mint or derive a uid.
+	uid := rorClientInterface.GetClusterUid()
 
 	report := apicontracts.Cluster{
 		ACL: apicontracts.AccessControlList{
 			AccessGroups: nhnToolingMetadata.AccessGroups,
 		},
 		Environment: nhnToolingMetadata.Environment,
-		ClusterId:   rorconfig.GetString(configconsts.CLUSTER_ID),
+		ClusterId:   rorClientInterface.GetClusterId(),
 		Uid:         uid,
 		ClusterName: clusterName,
 		Ingresses:   ingresses,

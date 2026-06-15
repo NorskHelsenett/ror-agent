@@ -108,38 +108,31 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 		Subject: aclmodels.Acl2Subject(clusterUID),
 	})
 
-	// Full update if resource is new or agent version changed, otherwise just update partial
-	needsFullUpdate := len(existing.Resources) == 0 ||
-		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions["RorAgent"] != rorversion.GetRorVersion().Version
-
 	clusterresource.RorMeta.LastReported = time.Now().String()
 	clusterresource.Metadata.Name = agentclient.GetClusterId()
 
 	hintsData := getHintsConfigMap(agentclient)
 
-	if needsFullUpdate {
-		clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
-			ClusterId:          agentclient.GetClusterId(),
-			ClusterName:        agentclient.GetClusterName(),
-			KubernetesProvider: agentclient.GetKubernetesProvider(),
-			Az:                 agentclient.GetAz(),
-			Region:             agentclient.GetRegion(),
-			Country:            agentclient.GetCountry(),
-			Workspace:          agentclient.GetClusterWorkspace(),
-			Datacenter:         agentclient.GetDatacenter(),
-			Environment:        getEnvironment(agentclient, hintsData),
-			Versions:           getVersions(hintsData),
-			Nodes:              getNodes(agentclient),
-			Endpoint:           getEndpoints(agentclient),
-			LastSeen:           time.Now(),
-			CreatedAt:          getCreatedTime(agentclient),
-			Urls:               getUrls(agentclient),
-		}
-	} else {
-		clusterresource.KubernetesClusterResource.Status.AgentStatus.LastSeen = time.Now()
-		clusterresource.KubernetesClusterResource.Status.AgentStatus.Versions = getVersions(hintsData)
-		clusterresource.KubernetesClusterResource.Status.AgentStatus.Urls = getUrls(agentclient)
-		clusterresource.KubernetesClusterResource.Status.AgentStatus.Nodes = getNodes(agentclient)
+	// Always rebuild the full AgentStatus so semi-static metadata (environment,
+	// region, az, datacenter, workspace, endpoint, ...) tracks interregator
+	// changes. Identical content hashes the same via GenRorHash, so this does not
+	// cause redundant writes.
+	clusterresource.KubernetesClusterResource.Status.AgentStatus = rortypes.KubernetesClusterAgentStatus{
+		ClusterId:          agentclient.GetClusterId(),
+		ClusterName:        agentclient.GetClusterName(),
+		KubernetesProvider: agentclient.GetKubernetesProvider(),
+		Az:                 agentclient.GetAz(),
+		Region:             agentclient.GetRegion(),
+		Country:            agentclient.GetCountry(),
+		Workspace:          agentclient.GetClusterWorkspace(),
+		Datacenter:         agentclient.GetDatacenter(),
+		Environment:        getEnvironment(agentclient, hintsData),
+		Versions:           getVersions(hintsData),
+		Nodes:              getNodes(agentclient),
+		Endpoint:           getEndpoints(agentclient),
+		LastSeen:           time.Now(),
+		CreatedAt:          getCreatedTime(agentclient),
+		Urls:               getUrls(agentclient),
 	}
 
 	//stringhelper.PrettyprintStruct(clusterresource)

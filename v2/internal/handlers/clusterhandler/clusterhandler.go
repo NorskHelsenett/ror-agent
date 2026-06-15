@@ -51,10 +51,10 @@ func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCache
 func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
 	// The cluster uid is owned and resolved by the agent client. The business
 	// logic only consumes it and must never mint or derive its own uid. Without an
-	// authoritative uid we skip the update rather than risk creating a duplicate.
 	clusterUID := agentclient.GetClusterUid()
 	if clusterUID == "" {
-		return fmt.Errorf("cluster uid not resolved by agent client, skipping cluster resource update")
+		rlog.Warn("cluster uid not resolved by agent client, skipping cluster resource update")
+		return nil
 	}
 
 	// Get myself

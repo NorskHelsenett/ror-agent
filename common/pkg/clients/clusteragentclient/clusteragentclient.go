@@ -47,6 +47,7 @@ type RorAgentClientInterface interface {
 	GetKubernetesClientset() *kubernetesclient.K8sClientsets
 	GetClusterInterregator() interregatortypes.ClusterInterregator
 	GetEgressIP() string
+	GetClusterUid() string
 
 	GetSigs() chan os.Signal
 	GetStopChan() chan struct{}
@@ -59,7 +60,8 @@ type RorAgentClientConfig struct {
 	role         string
 	namespace    string
 	apiEndpoint  string
-	identifier   string
+	clusterId    string
+	clusterUid   string
 	apiKey       string
 	apiKeySecret string
 	interregator interregatortypes.ClusterInterregator
@@ -150,14 +152,26 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 	}
 
 	rlog.Info("connected to ror-api", rlog.String("version", ver), rlog.String("clusterid", selfdata.User.Name), rlog.String("uid", selfdata.User.Uid))
+
+	// The cluster uid is owned by the client, not the business logic. The API is
+	// the authoritative source: Self().User.Uid is deterministic. If it is set we
+	// adopt it unconditionally; we never mint a uid here.
+	if selfdata.User.Uid != "" {
+		client.setClusterUid(selfdata.User.Uid)
+	}
+
+	// Set the client ownerref subject to the cluster uid so all child resources are
+	// owned by the stable uid. Fall back to the clusterid only during bootstrap when
+	// the uid is not yet known (the ACL accepts either during migration).
+	ownerSubject := selfdata.User.Uid
+	if ownerSubject == "" {
+		ownerSubject = selfdata.User.Name
+	}
 	client.rorAPIClient.SetOwnerref(rorresourceowner.RorResourceOwnerReference{
 		Scope:   aclmodels.Acl2ScopeCluster,
-		Subject: aclmodels.Acl2Subject(selfdata.User.Name),
+		Subject: aclmodels.Acl2Subject(ownerSubject),
 	})
 	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.User.Name)
-	if selfdata.User.Uid != "" {
-		rorconfig.Set(configconsts.CLUSTER_UID, selfdata.User.Uid)
-	}
 
 	// Persist UID to secret so it's available on restart without an API call
 	if selfdata.User.Uid != "" {
@@ -205,7 +219,7 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 
 	// ClusterID unknown in both secret and interregator
 	// Will failover to asking the api for existing clusterid if apikey is set
-	if (r.config.identifier == UNKNOWN_CLUSTER_ID) && (interregatorClusterid == providermodels.UNKNOWN_CLUSTER_ID) && (r.config.apiKey != UNKNOWN_API_KEY) {
+	if (r.config.clusterId == UNKNOWN_CLUSTER_ID) && (interregatorClusterid == providermodels.UNKNOWN_CLUSTER_ID) && (r.config.apiKey != UNKNOWN_API_KEY) {
 		rlog.Info("Trying to ask the api for existing cluster id")
 		err = r.initAuthorizedRorClient()
 		if err != nil {
@@ -222,26 +236,26 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 			return err
 		}
 
-		r.config.identifier = selfdata.User.Name
+		r.config.clusterId = selfdata.User.Name
 		err = r.kubernetesUpdateOrCreateApiKeySecret()
 		if err != nil {
 			return fmt.Errorf("failed to update api key secret with cluster id %s", err)
 		}
-		rlog.Info("Using cluster id from api", rlog.String("cluster id", r.config.identifier))
+		rlog.Info("Using cluster id from api", rlog.String("cluster id", r.config.clusterId))
 	}
 
 	// Warn if cluster id in secret does not match interregator cluster id
 	// If both are known
-	if r.config.identifier != interregatorClusterid && interregatorClusterid != providermodels.UNKNOWN_CLUSTER_ID {
+	if r.config.clusterId != interregatorClusterid && interregatorClusterid != providermodels.UNKNOWN_CLUSTER_ID {
 		rlog.Warn("cluster id in secret does not match interregator cluster id, using secret cluster id",
-			rlog.String("secret cluster id", r.config.identifier),
+			rlog.String("secret cluster id", r.config.clusterId),
 			rlog.String("interregator cluster id", interregatorClusterid))
 	}
 
 	// Use interregator cluster id if secret cluster id is unknown and interregator cluster id is known
-	if r.config.identifier == UNKNOWN_CLUSTER_ID && interregatorClusterid != providermodels.UNKNOWN_CLUSTER_ID {
+	if r.config.clusterId == UNKNOWN_CLUSTER_ID && interregatorClusterid != providermodels.UNKNOWN_CLUSTER_ID {
 		rlog.Info("Using cluster id from interregator", rlog.String("cluster id", interregatorClusterid))
-		r.config.identifier = interregatorClusterid
+		r.config.clusterId = interregatorClusterid
 		err = r.kubernetesUpdateOrCreateApiKeySecret()
 		if err != nil {
 			return fmt.Errorf("failed to update api key secret with cluster id %s", err)
@@ -249,14 +263,14 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 	}
 
 	// If no cluster id is found, generate new cluster id
-	if r.config.identifier == UNKNOWN_CLUSTER_ID {
+	if r.config.clusterId == UNKNOWN_CLUSTER_ID {
 		rlog.Info("cluster id not found in secret or interregator, generating new cluster id")
 		clustername := r.config.interregator.GetClusterName()
 		if clustername == "" {
 			err = fmt.Errorf("Could not get clustername, failing")
 			return err
 		}
-		r.config.identifier = idhelper.GetIdentifier(clustername)
+		r.config.clusterId = idhelper.GetIdentifier(clustername)
 		err = r.kubernetesUpdateOrCreateApiKeySecret()
 		if err != nil {
 			return fmt.Errorf("failed to update api key secret with cluster id %s", err)
@@ -268,17 +282,24 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 
 		r.initUnathorizedRorClient()
 		resp, err := r.rorAPIClient.ApiKeysV2().RegisterAgent(context.TODO(), apikeystypes.RegisterClusterRequest{
-			ClusterId: r.config.identifier,
+			ClusterId: r.config.clusterId,
+			// Forward a known uid (e.g. from a prior secret) as a hint. The API
+			// verifies it and never blindly trusts it.
+			Uid: r.config.clusterUid,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to register cluster %s", err)
 		}
-		if r.config.identifier != resp.ClusterId {
-			rlog.Info("The api changed the cluster id during registration", rlog.String("old cluster id", r.config.identifier), rlog.String("new cluster id", resp.ClusterId))
+		if r.config.clusterId != resp.ClusterId {
+			rlog.Info("The api changed the cluster id during registration", rlog.String("old cluster id", r.config.clusterId), rlog.String("new cluster id", resp.ClusterId))
 		}
 
-		r.config.identifier = resp.ClusterId
+		r.config.clusterId = resp.ClusterId
 		r.config.apiKey = resp.ApiKey
+		// The API is authoritative for the uid and returns it on registration.
+		if resp.Uid != "" {
+			r.setClusterUid(resp.Uid)
+		}
 		// Create or update the secret with new api key and cluster id
 		err = r.kubernetesUpdateOrCreateApiKeySecret()
 		if err != nil {
@@ -288,22 +309,26 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 	}
 
 	// Setting the config env values for cluster id and api key for backward compatibility
-	rorconfig.Set(configconsts.CLUSTER_ID, r.config.identifier)
+	rorconfig.Set(configconsts.CLUSTER_ID, r.config.clusterId)
 	rorconfig.Set(configconsts.API_KEY, r.config.apiKey)
 	return nil
 }
 
 func (r *rorAgentClient) kubernetesCreateApiKeySecret() error {
+	stringData := map[string]string{
+		"APIKEY":     r.config.apiKey,
+		"CLUSTER_ID": r.config.clusterId,
+	}
+	if r.config.clusterUid != "" {
+		stringData["CLUSTER_UID"] = r.config.clusterUid
+	}
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.config.apiKeySecret,
 			Namespace: r.config.namespace,
 		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"APIKEY":     r.config.apiKey,
-			"CLUSTER_ID": r.config.identifier,
-		},
+		Type:       corev1.SecretTypeOpaque,
+		StringData: stringData,
 	}
 	_, err := r.k8sClientSet.CreateSecret(r.config.namespace, secret)
 	if err != nil {
@@ -331,11 +356,11 @@ func (r *rorAgentClient) kubernetesUpdateOrCreateApiKeySecret() error {
 		secret.Data["APIKEY"] = []byte(r.config.apiKey)
 		hasChanged = true
 	}
-	if r.config.identifier != UNKNOWN_CLUSTER_ID && string(secret.Data["CLUSTER_ID"]) != r.config.identifier {
-		secret.Data["CLUSTER_ID"] = []byte(r.config.identifier)
+	if r.config.clusterId != UNKNOWN_CLUSTER_ID && string(secret.Data["CLUSTER_ID"]) != r.config.clusterId {
+		secret.Data["CLUSTER_ID"] = []byte(r.config.clusterId)
 		hasChanged = true
 	}
-	if uid := rorconfig.GetString(configconsts.CLUSTER_UID); uid != "" && string(secret.Data["CLUSTER_UID"]) != uid {
+	if uid := r.config.clusterUid; uid != "" && string(secret.Data["CLUSTER_UID"]) != uid {
 		secret.Data["CLUSTER_UID"] = []byte(uid)
 		hasChanged = true
 	}
@@ -360,7 +385,7 @@ func (r *rorAgentClient) getClusterAuthFromSecret() error {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			rlog.Warn("api key secret not found")
-			r.config.identifier = UNKNOWN_CLUSTER_ID
+			r.config.clusterId = UNKNOWN_CLUSTER_ID
 			r.config.apiKey = UNKNOWN_API_KEY
 			return nil
 		} else {
@@ -369,16 +394,16 @@ func (r *rorAgentClient) getClusterAuthFromSecret() error {
 		}
 	}
 
-	r.config.identifier = string(secret.Data["CLUSTER_ID"])
-	if r.config.identifier == "" {
-		r.config.identifier = UNKNOWN_CLUSTER_ID
+	r.config.clusterId = string(secret.Data["CLUSTER_ID"])
+	if r.config.clusterId == "" {
+		r.config.clusterId = UNKNOWN_CLUSTER_ID
 	}
 	r.config.apiKey = string(secret.Data["APIKEY"])
 	if r.config.apiKey == "" {
 		r.config.apiKey = UNKNOWN_API_KEY
 	}
 	if uid := string(secret.Data["CLUSTER_UID"]); uid != "" {
-		rorconfig.Set(configconsts.CLUSTER_UID, uid)
+		r.setClusterUid(uid)
 	}
 	return nil
 }
@@ -462,7 +487,22 @@ func (r *rorAgentClient) GetClusterInterregator() interregatortypes.ClusterInter
 }
 
 func (r *rorAgentClient) GetClusterId() string {
-	return r.config.identifier
+	return r.config.clusterId
+}
+
+// GetClusterUid returns the authoritative cluster uid resolved by the client.
+// The uid is owned by the client (resolved from the secret, the registration
+// response, or Self) and consumed by the business logic; the business logic must
+// not mint or derive its own uid.
+func (r *rorAgentClient) GetClusterUid() string {
+	return r.config.clusterUid
+}
+
+// setClusterUid records the cluster uid on the client config. The uid is owned by
+// the client and exposed to the business logic via GetClusterUid; it is
+// deliberately not mirrored to any global config or environment variable.
+func (r *rorAgentClient) setClusterUid(uid string) {
+	r.config.clusterUid = uid
 }
 
 func (r *rorAgentClient) GetProvider() providermodels.ProviderType {

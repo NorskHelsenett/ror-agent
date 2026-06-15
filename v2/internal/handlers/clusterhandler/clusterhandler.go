@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
-	"github.com/NorskHelsenett/ror/pkg/config/configconsts"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
@@ -16,7 +15,6 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources"
 	"github.com/NorskHelsenett/ror/pkg/rorresources/rortypes"
-	"github.com/google/uuid"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,6 +49,14 @@ func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCache
 }
 
 func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
+	// The cluster uid is owned and resolved by the agent client. The business
+	// logic only consumes it and must never mint or derive its own uid. Without an
+	clusterUID := agentclient.GetClusterUid()
+	if clusterUID == "" {
+		rlog.Warn("cluster uid not resolved by agent client, skipping cluster resource update")
+		return nil
+	}
+
 	// Get myself
 	existing, err := agentclient.GetRorClient().V2().Resources().Get(context.TODO(), rorresources.ResourceQuery{
 		VersionKind: rortypes.ResourceKubernetesClusterGVK,
@@ -67,8 +73,11 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	// Add cluster resource to workqueue to ensure it exists in the system and to trigger any logic related to it
 	var clusterresource *rorresources.Resource
 	if len(existing.Resources) == 0 {
+		// Create with the authoritative uid from the client. Because the resource is
+		// upserted by uid, creating with a stable uid is idempotent and cannot
+		// produce duplicates even if this Get spuriously returned empty.
 		clusterresource = rorresources.NewRorKubernetesClusterResource()
-		clusterresource.Metadata.UID = types.UID(uuid.NewString())
+		clusterresource.Metadata.UID = types.UID(clusterUID)
 		clusterresource.Metadata.CreationTimestamp = v1.Now()
 		err = clusterresource.SetRorMeta(rortypes.ResourceRorMeta{
 			Version:  "v2",
@@ -89,10 +98,6 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 			Subject: aclmodels.Acl2Subject(string(clusterresource.Metadata.UID)),
 		}
 	}
-
-	// Update ownerref subject to use the KubernetesCluster UID.
-	clusterUID := string(clusterresource.Metadata.UID)
-	rorconfig.Set(configconsts.CLUSTER_UID, clusterUID)
 
 	// Set the client ownerref to UID for all child resources.
 	// The KubernetesCluster resource keeps its original ownerref (clusterid on

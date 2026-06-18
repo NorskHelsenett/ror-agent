@@ -3,7 +3,7 @@ module github.com/NorskHelsenett/ror-agent/common
 go 1.26.4
 
 require (
-	github.com/NorskHelsenett/ror v1.19.4
+	github.com/NorskHelsenett/ror v1.20.0
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
 	k8s.io/client-go v0.36.2

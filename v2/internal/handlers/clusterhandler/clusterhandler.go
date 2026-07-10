@@ -90,7 +90,10 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	}
 
 	if len(existing.Resources) == 1 {
-		clusterresource = rorresources.NewResourceFromStruct(*existing.Resources[0])
+		clusterresource, err = rorresources.NewResourceFromStruct(*existing.Resources[0])
+		if err != nil {
+			return fmt.Errorf("error converting existing resource to struct: %w", err)
+		}
 		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
 		// Update the KubernetesCluster ownerref to UID on subsequent runs
 		clusterresource.RorMeta.Ownerref = rorresourceowner.RorResourceOwnerReference{
@@ -305,6 +308,9 @@ func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.K
 			},
 			Architecture:      node.Status.NodeInfo.Architecture,
 			KubernetesVersion: node.Status.NodeInfo.KubeletVersion,
+			OsImage:           node.Status.NodeInfo.OSImage,
+			KernelVersion:     node.Status.NodeInfo.KernelVersion,
+			OperatingSystem:   node.Status.NodeInfo.OperatingSystem,
 		}
 
 		if usage, ok := nodeMetricsMap[node.Name]; ok {

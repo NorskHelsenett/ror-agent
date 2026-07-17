@@ -33,7 +33,7 @@ type resourcecache struct {
 func (rc *resourcecache) MustInit(client clusteragentclient.RorAgentClientInterface) {
 	var err error
 	if client == nil {
-		rc.client, err = clusteragentclient.NewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
+		rc.client, err = clusteragentclient.NewRorAgentClient()
 		if err != nil {
 			rlog.Fatal("failed to initialize cluster agent client for resource cache", err)
 		}

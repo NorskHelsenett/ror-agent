@@ -1,12 +1,11 @@
 module github.com/NorskHelsenett/ror-agent/v2
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/NorskHelsenett/ror v1.21.3
 	github.com/NorskHelsenett/ror-agent/common v0.0.0
 	github.com/go-co-op/gocron v1.37.0
-	k8s.io/apimachinery v0.36.2
 )
 
 require (
@@ -123,6 +122,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.36.2 // indirect
+	k8s.io/apimachinery v0.36.2 // indirect
 	k8s.io/client-go v0.36.2 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260603220949-865597e52e25 // indirect

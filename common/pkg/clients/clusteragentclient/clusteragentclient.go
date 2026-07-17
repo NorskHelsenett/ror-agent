@@ -12,6 +12,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusterhandler"
+	"github.com/NorskHelsenett/ror-agent/common/pkg/controllers/dynamiccontroller"
+
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apikeystypes/v2"
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
@@ -22,6 +25,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/idhelper"
+	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
 	"github.com/NorskHelsenett/ror/pkg/helpers/rorhealth"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v3"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v3"
@@ -30,16 +34,24 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
 	identitymodels "github.com/NorskHelsenett/ror/pkg/models/identity"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
+	"github.com/NorskHelsenett/ror/pkg/rorresources/rordefs"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 )
 
 const (
 	UNKNOWN_CLUSTER_ID = "___unknown_cluster_id___"
 	UNKNOWN_API_KEY    = "___unknown_api_key___"
+
+	// defaultResourceCacheWorkQueueInterval is the work queue polling interval,
+	// in seconds, used when the resource cache is created without an explicit
+	// interval (e.g. via a bare call to GetResourceCache).
+	defaultResourceCacheWorkQueueInterval = 10
 )
 
 type RorAgentClientInterface interface {
@@ -49,6 +61,18 @@ type RorAgentClientInterface interface {
 	GetEgressIP() string
 	GetClusterUid() string
 
+	// GetResourceCache returns the client's resource cache, lazily initializing
+	// it on first call if it wasn't created eagerly via WithResourceCache.
+	// Subsequent calls return the same instance.
+	GetResourceCache() (resourcecache.ResourceCacheInterface, error)
+
+	// StartDynamicClient starts the dynamic resource watchers for the given
+	// handler and schemas, lazily resolving the underlying kubernetes dynamic
+	// and discovery clients on first call. If it wasn't already started eagerly
+	// via WithDynamicClient, calling this starts it. Subsequent calls are no-ops
+	// and return the result of the first call.
+	StartDynamicClient(handler DynamicClientHandler, schemas ...schema.GroupVersionResource) error
+
 	GetSigs() chan os.Signal
 	GetStopChan() chan struct{}
 	PingRorAPI() error
@@ -56,28 +80,125 @@ type RorAgentClientInterface interface {
 	interregatortypes.ClusterInterregator
 }
 
+// DynamicClientHandler resolves the resource event handlers used by the
+// dynamic client's watchers for a given schema.
+type DynamicClientHandler interface {
+	GetHandlersForSchema(schema schema.GroupVersionResource) dynamiccontroller.DynamicHandler
+}
+
 type RorAgentClientConfig struct {
-	role         string
-	namespace    string
-	apiEndpoint  string
-	clusterId    string
-	clusterUid   string
-	apiKey       string
-	apiKeySecret string
-	interregator interregatortypes.ClusterInterregator
+	role                           string
+	namespace                      string
+	apiEndpoint                    string
+	clusterId                      string
+	clusterUid                     string
+	apiKey                         string
+	apiKeySecret                   string
+	interregator                   interregatortypes.ClusterInterregator
+	resourceCacheEnabled           bool
+	resourceCacheWorkQueueInterval int
+	dynamicClientEnabled           bool
+	dynamicClientSchemas           []schema.GroupVersionResource
 }
 
 type rorAgentClient struct {
-	rorAPIClient *rorclient.RorClient
-	k8sClientSet *kubernetesclient.K8sClientsets
-	config       RorAgentClientConfig
-	stopChan     chan struct{}
-	sigs         chan os.Signal
-	egressOnce   sync.Once
-	egressIP     string
+	rorAPIClient      *rorclient.RorClient
+	k8sClientSet      *kubernetesclient.K8sClientsets
+	config            RorAgentClientConfig
+	stopChan          chan struct{}
+	sigs              chan os.Signal
+	egressOnce        sync.Once
+	egressIP          string
+	resourceCacheOnce sync.Once
+	resourceCache     resourcecache.ResourceCacheInterface
+	resourceCacheErr  error
+	dynamicClientOnce sync.Once
+	dynamicClientErr  error
 }
 
-func GetDefaultRorAgentClientConfig() *RorAgentClientConfig {
+// Option configures a RorAgentClientConfig. Options are applied on top of the
+// defaults resolved from rorconfig, in the order they are passed to
+// NewRorAgentClient or MustInitNewRorAgentClient.
+type Option func(*RorAgentClientConfig)
+
+// WithRole overrides the role used to identify this client to ror-api.
+func WithRole(role string) Option {
+	return func(c *RorAgentClientConfig) {
+		c.role = role
+	}
+}
+
+// WithNamespace overrides the kubernetes namespace the client operates in.
+func WithNamespace(namespace string) Option {
+	return func(c *RorAgentClientConfig) {
+		c.namespace = namespace
+	}
+}
+
+// WithApiEndpoint overrides the ror-api endpoint the client connects to.
+func WithApiEndpoint(apiEndpoint string) Option {
+	return func(c *RorAgentClientConfig) {
+		c.apiEndpoint = apiEndpoint
+	}
+}
+
+// WithApiKeySecret overrides the name of the kubernetes secret holding the api key.
+func WithApiKeySecret(apiKeySecret string) Option {
+	return func(c *RorAgentClientConfig) {
+		c.apiKeySecret = apiKeySecret
+	}
+}
+
+// WithApiKey overrides the api key used to authenticate against ror-api.
+func WithApiKey(apiKey string) Option {
+	return func(c *RorAgentClientConfig) {
+		c.apiKey = apiKey
+	}
+}
+
+// WithClusterId overrides the cluster id used to identify this cluster to ror-api.
+func WithClusterId(clusterId string) Option {
+	return func(c *RorAgentClientConfig) {
+		c.clusterId = clusterId
+	}
+}
+
+// WithResourceCache enables eager creation of the client's resource cache during
+// NewRorAgentClient/MustInitNewRorAgentClient, polling the work queue every
+// workQueueInterval seconds. If workQueueInterval is <= 0, a default interval is
+// used. If this option is not set, the resource cache is instead created lazily
+// the first time GetResourceCache is called.
+func WithResourceCache(workQueueInterval int) Option {
+	return func(c *RorAgentClientConfig) {
+		c.resourceCacheEnabled = true
+		c.resourceCacheWorkQueueInterval = workQueueInterval
+	}
+}
+
+// WithDynamicClient enables eager start of the client's dynamic resource
+// watchers during NewRorAgentClient/MustInitNewRorAgentClient, for the given
+// schemas. If no schemas are provided, the default agent schemas are used.
+// The watchers report changes to the client's resource cache using a handler
+// built internally; use StartDynamicClient directly instead if a custom
+// DynamicClientHandler is needed. If this option is not set, the dynamic
+// client is instead started lazily the first time StartDynamicClient is
+// called.
+//
+// The dynamic client depends on the resource cache: starting it also starts
+// the cluster handler, which keeps the cluster's own resource up to date
+// using that same resource cache. If WithResourceCache wasn't also passed,
+// the resource cache is enabled automatically with the default work queue
+// interval.
+func WithDynamicClient(schemas ...schema.GroupVersionResource) Option {
+	return func(c *RorAgentClientConfig) {
+		c.dynamicClientEnabled = true
+		c.dynamicClientSchemas = schemas
+	}
+}
+
+// defaultRorAgentClientConfig resolves the base configuration from rorconfig,
+// before any Option is applied.
+func defaultRorAgentClientConfig() *RorAgentClientConfig {
 	rorconfig.SetDefault(configconsts.API_KEY, UNKNOWN_API_KEY)
 	return &RorAgentClientConfig{
 		role:         rorconfig.GetString(configconsts.ROLE),
@@ -88,21 +209,31 @@ func GetDefaultRorAgentClientConfig() *RorAgentClientConfig {
 	}
 }
 
-func NewRorAgentClientWithDefaults() (RorAgentClientInterface, error) {
-	return NewRorAgentClient(GetDefaultRorAgentClientConfig())
-}
-
-func MustInitNewRorAgentClient(config *RorAgentClientConfig) RorAgentClientInterface {
-	client, err := NewRorAgentClient(config)
+// MustInitNewRorAgentClient initializes a new RorAgentClient, applying any
+// provided Options on top of the defaults resolved from rorconfig. It panics
+// (via rlog.Fatal) if initialization fails.
+func MustInitNewRorAgentClient(opts ...Option) RorAgentClientInterface {
+	client, err := NewRorAgentClient(opts...)
 	if err != nil {
 		rlog.Fatal("failed to initialize RorAgentClient", err)
 	}
 	return client
 }
 
-func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, error) {
-	if config == nil {
-		return nil, fmt.Errorf("config cannot be nil, please use NewRorAgentClientWithDefaults if no custom config is needed")
+// NewRorAgentClient initializes a new RorAgentClient, applying any provided
+// Options on top of the defaults resolved from rorconfig.
+func NewRorAgentClient(opts ...Option) (RorAgentClientInterface, error) {
+	config := defaultRorAgentClientConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	// WithDynamicClient depends on the resource cache. If the caller enabled
+	// it without also passing WithResourceCache, enable the resource cache
+	// with the default work queue interval instead of requiring both options.
+	if config.dynamicClientEnabled && !config.resourceCacheEnabled {
+		config.resourceCacheEnabled = true
+		config.resourceCacheWorkQueueInterval = defaultResourceCacheWorkQueueInterval
 	}
 
 	if err := config.Validate(); err != nil {
@@ -180,7 +311,95 @@ func NewRorAgentClient(config *RorAgentClientConfig) (RorAgentClientInterface, e
 
 	rorhealth.Register(context.TODO(), "rorAPI", client.rorAPIClient)
 
+	var resourceCache resourcecache.ResourceCacheInterface
+	if config.resourceCacheEnabled {
+		resourceCache, err = client.GetResourceCache()
+		if err != nil {
+			rlog.Error("failed to initialize resource cache", err)
+			return nil, err
+		}
+	}
+
+	if config.dynamicClientEnabled {
+		if err := clusterhandler.Start(client, resourceCache); err != nil {
+			rlog.Error("failed to start cluster handler", err)
+			return nil, err
+		}
+
+		handler := newDefaultDynamicClientHandler(resourceCache)
+		if err := client.StartDynamicClient(handler, config.dynamicClientSchemas...); err != nil {
+			rlog.Error("failed to start dynamic client", err)
+			return nil, err
+		}
+	}
+
 	return client, nil
+}
+
+// GetResourceCache returns the client's resource cache, creating it on first
+// call if it hasn't already been created eagerly via WithResourceCache. The
+// created cache (or the initialization error) is cached, so subsequent calls
+// always return the same result.
+func (r *rorAgentClient) GetResourceCache() (resourcecache.ResourceCacheInterface, error) {
+	r.resourceCacheOnce.Do(func() {
+		interval := r.config.resourceCacheWorkQueueInterval
+		if interval <= 0 {
+			interval = defaultResourceCacheWorkQueueInterval
+		}
+		r.resourceCache, r.resourceCacheErr = resourcecache.NewResourceCache(resourcecache.ResourceCacheConfig{
+			WorkQueueInterval: interval,
+			RorClient:         r.rorAPIClient,
+		})
+	})
+	return r.resourceCache, r.resourceCacheErr
+}
+
+// StartDynamicClient resolves the kubernetes dynamic and discovery clients and
+// starts a watcher for each schema whose resource is enabled in the cluster,
+// dispatching events to the handler returned by DynamicClientHandler. It only
+// runs once; subsequent calls are no-ops and return the result of the first call.
+func (r *rorAgentClient) StartDynamicClient(handler DynamicClientHandler, schemas ...schema.GroupVersionResource) error {
+	r.dynamicClientOnce.Do(func() {
+		r.dynamicClientErr = r.startDynamicClient(handler, schemas...)
+	})
+	return r.dynamicClientErr
+}
+
+func (r *rorAgentClient) startDynamicClient(handler DynamicClientHandler, schemas ...schema.GroupVersionResource) error {
+	rlog.Info("Starting dynamic watchers")
+	dynamicClient, err := r.k8sClientSet.GetDynamicClient()
+	if err != nil {
+		return fmt.Errorf("failed to get dynamic client: %w", err)
+	}
+	discoveryClient, err := r.k8sClientSet.GetDiscoveryClient()
+	if err != nil {
+		return fmt.Errorf("failed to get discovery client: %w", err)
+	}
+
+	if len(schemas) == 0 {
+		schemas = rordefs.Resourcedefs.GetSchemasByType(rordefs.ApiResourceTypeAgent)
+	}
+
+	for _, s := range schemas {
+		enabled, err := discovery.IsResourceEnabled(discoveryClient, s)
+		if err != nil {
+			return fmt.Errorf("could not query resources from cluster: %w", err)
+		}
+		if !enabled {
+			rlog.Warn(fmt.Sprintf("Could not register resource %s", s.Resource))
+			continue
+		}
+
+		controller := dynamiccontroller.NewDynamicController(dynamicClient, handler.GetHandlersForSchema(s))
+		go func() {
+			controller.Run(r.stopChan)
+			sig := <-r.sigs
+			rlog.Info("received signal, stopping dynamic watcher", rlog.Any("signal", sig))
+			r.stopChan <- struct{}{}
+		}()
+	}
+
+	return nil
 }
 
 func (r *rorAgentClient) GetRorClient() rorclient.RorClientInterface {

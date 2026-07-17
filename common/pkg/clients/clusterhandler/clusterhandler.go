@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/NorskHelsenett/ror-agent/common/pkg/clients/clusteragentclient"
+	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
+	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
+	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v3"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
@@ -21,14 +23,30 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func MustStart(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) {
+// Client is the subset of clusteragentclient.RorAgentClientInterface required
+// by this package. It is defined locally (rather than importing
+// clusteragentclient) to avoid an import cycle, since clusteragentclient
+// depends on this package to start the cluster handler as part of the
+// WithDynamicClient option. Any clusteragentclient.RorAgentClientInterface
+// value satisfies this interface structurally.
+type Client interface {
+	interregatortypes.ClusterInterregator
+
+	GetClusterUid() string
+	GetRorClient() rorclient.RorClientInterface
+	GetClusterInterregator() interregatortypes.ClusterInterregator
+	GetEgressIP() string
+	GetKubernetesClientset() *kubernetesclient.K8sClientsets
+}
+
+func MustStart(agentclient Client, resourceCacheInterface resourcecache.ResourceCacheInterface) {
 	err := Start(agentclient, resourceCacheInterface)
 	if err != nil {
 		rlog.Fatal("could not start cluster handler", err)
 	}
 }
 
-func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
+func Start(agentclient Client, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
 	rlog.Info("Starting cluster handler", rlog.String("clusterid", agentclient.GetClusterId()))
 
 	if err := updateClusterResource(agentclient, resourceCacheInterface); err != nil {
@@ -48,7 +66,7 @@ func Start(agentclient clusteragentclient.RorAgentClientInterface, resourceCache
 	return nil
 }
 
-func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterface, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
+func updateClusterResource(agentclient Client, resourceCacheInterface resourcecache.ResourceCacheInterface) error {
 	// The cluster uid is owned and resolved by the agent client. The business
 	// logic only consumes it and must never mint or derive its own uid. Without an
 	clusterUID := agentclient.GetClusterUid()
@@ -161,7 +179,7 @@ func updateClusterResource(agentclient clusteragentclient.RorAgentClientInterfac
 	return nil
 }
 
-func getEndpoints(agentclient clusteragentclient.RorAgentClientInterface) rortypes.KubernetesClusterAgentStatusEndpoint {
+func getEndpoints(agentclient Client) rortypes.KubernetesClusterAgentStatusEndpoint {
 
 	return rortypes.KubernetesClusterAgentStatusEndpoint{
 		ApiServer: agentclient.GetClusterInterregator().GetKubernetesApiServer(),
@@ -170,7 +188,7 @@ func getEndpoints(agentclient clusteragentclient.RorAgentClientInterface) rortyp
 	}
 }
 
-func getUrls(agentclient clusteragentclient.RorAgentClientInterface) map[string]string {
+func getUrls(agentclient Client) map[string]string {
 	hasIngress, hasHTTPRoute := discoverRouteAPIs(agentclient)
 	return map[string]string{
 		"Argocd":  getUrl(agentclient, "argocd", "argocd-server", hasIngress, hasHTTPRoute),
@@ -180,7 +198,7 @@ func getUrls(agentclient clusteragentclient.RorAgentClientInterface) map[string]
 
 // discoverRouteAPIs checks whether networking.k8s.io/v1 Ingress and
 // gateway.networking.k8s.io/v1 HTTPRoute APIs are available in the cluster.
-func discoverRouteAPIs(agentclient clusteragentclient.RorAgentClientInterface) (hasIngress bool, hasHTTPRoute bool) {
+func discoverRouteAPIs(agentclient Client) (hasIngress bool, hasHTTPRoute bool) {
 	disco, err := agentclient.GetKubernetesClientset().GetDiscoveryClient()
 	if err != nil {
 		return false, false
@@ -207,7 +225,7 @@ func discoverRouteAPIs(agentclient clusteragentclient.RorAgentClientInterface) (
 	return hasIngress, hasHTTPRoute
 }
 
-func getUrl(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string, hasIngress bool, hasHTTPRoute bool) string {
+func getUrl(agentclient Client, namespace string, name string, hasIngress bool, hasHTTPRoute bool) string {
 	if hasIngress {
 		if url := getUrlFromIngress(agentclient, namespace, name); url != "" {
 			return url
@@ -221,7 +239,7 @@ func getUrl(agentclient clusteragentclient.RorAgentClientInterface, namespace st
 	return ""
 }
 
-func getUrlFromIngress(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string) string {
+func getUrlFromIngress(agentclient Client, namespace string, name string) string {
 	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
 	if err != nil {
 		return ""
@@ -245,7 +263,7 @@ func getUrlFromIngress(agentclient clusteragentclient.RorAgentClientInterface, n
 	return ""
 }
 
-func getUrlFromHTTPRoute(agentclient clusteragentclient.RorAgentClientInterface, namespace string, name string) string {
+func getUrlFromHTTPRoute(agentclient Client, namespace string, name string) string {
 	dynClient, err := agentclient.GetKubernetesClientset().GetDynamicClient()
 	if err != nil {
 		return ""
@@ -266,7 +284,7 @@ func getUrlFromHTTPRoute(agentclient clusteragentclient.RorAgentClientInterface,
 	return "https://" + hostnames[0]
 }
 
-func getCreatedTime(agentclient clusteragentclient.RorAgentClientInterface) time.Time {
+func getCreatedTime(agentclient Client) time.Time {
 	// get the kube-system namespace creation time, as a proxy for cluster creation time, as the agent will be deployed shortly after cluster creation
 	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
 	if err != nil {
@@ -288,7 +306,7 @@ func getVersions(hintsData map[string]string) map[string]string {
 	}
 }
 
-func getNodes(agentclient clusteragentclient.RorAgentClientInterface) rortypes.KubernetesClusterAgentStatusNodes {
+func getNodes(agentclient Client) rortypes.KubernetesClusterAgentStatusNodes {
 	interregator := agentclient.GetClusterInterregator()
 	nodes := interregator.Nodes().Get()
 
@@ -353,7 +371,7 @@ type nodeMetricsUsage struct {
 	memory rortypes.Quantity
 }
 
-func getNodeMetricsMap(agentclient clusteragentclient.RorAgentClientInterface) map[string]nodeMetricsUsage {
+func getNodeMetricsMap(agentclient Client) map[string]nodeMetricsUsage {
 	metricsClient, err := agentclient.GetKubernetesClientset().GetMetricsV1Beta1Client()
 	if err != nil {
 		rlog.Warn("could not get metrics client, node usage will not be reported")
@@ -381,7 +399,7 @@ const (
 // getEnvironment determines the environment of the cluster based on the interregator's GetEnvironment method.
 // If the interregator returns a known environment, it will try to get a configmap/key
 // lastly it will guestimate the environment based on the cluster name, region and az, using a simple heuristic.
-func getEnvironment(agentclient clusteragentclient.RorAgentClientInterface, hintsData map[string]string) string {
+func getEnvironment(agentclient Client, hintsData map[string]string) string {
 	interregator := agentclient.GetClusterInterregator()
 	interregatorEnv := interregator.GetEnvironment()
 	if interregatorEnv != providermodels.UNKNOWN_UNDEFINED && interregatorEnv != providermodels.UNKNOWN_ENVIRONMENT {
@@ -396,7 +414,7 @@ func getEnvironment(agentclient clusteragentclient.RorAgentClientInterface, hint
 }
 
 // getHintsConfigMap fetches the nhn-tooling configmap, returning nil if unavailable.
-func getHintsConfigMap(agentclient clusteragentclient.RorAgentClientInterface) map[string]string {
+func getHintsConfigMap(agentclient Client) map[string]string {
 	client, err := agentclient.GetKubernetesClientset().GetKubernetesClientset()
 	if err != nil {
 		rlog.Warn("could not get kubernetes clientset to get configmap", rlog.String("configmap", hintsConfigmap))

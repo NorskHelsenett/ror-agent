@@ -26,5 +26,5 @@ func main() {
 	generator := rorgenerator.NewGenerator()
 	// Resource controller - api
 	//   - internal/controllers/resourcescontroller/resources_controller_read_generated.go
-	generator.TemplateFile("internal/models/rorresources/extractResource.go.tmpl", rordefs.Resourcedefs.GetResourcesByVersion(rordefs.ApiVersionV1).GetResourcesByType(rordefs.ApiResourceTypeAgent))
+	generator.TemplateFile("internal/models/rorresources/extractResource.go.tmpl", rordefs.Resourcedefs.GetResourcesByType(rordefs.ApiResourceTypeClusterAgentV1))
 }

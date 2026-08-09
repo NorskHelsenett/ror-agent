@@ -26,7 +26,7 @@ func main() {
 
 	services.GetEgressIp()
 
-	rorClientInterface := clusteragentclient.MustInitNewRorAgentClient(clusteragentclient.GetDefaultRorAgentClientConfig())
+	rorClientInterface := clusteragentclient.MustInitNewRorAgentClient()
 
 	resourceupdate.ResourceCache.MustInit(rorClientInterface)
 

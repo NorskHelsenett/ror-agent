@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/NorskHelsenett/ror v1.21.6
 	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
+	k8s.io/apimachinery v0.36.4
 	k8s.io/client-go v0.36.3
 )
 

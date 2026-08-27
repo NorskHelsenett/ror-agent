@@ -58,7 +58,7 @@ func NodeExporterReporting(rorAgentClientInterface clusteragentclient.RorAgentCl
 		Nodes: nodes,
 	}
 
-	err = rorClientInterface.Metrics().PostReport(context.TODO(), report)
+	err = rorClientInterface.V1().Metrics().PostReport(context.TODO(), report)
 	if err != nil {
 		rlog.Error("error posting node_exporter metrics", err)
 		return err

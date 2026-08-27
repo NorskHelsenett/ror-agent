@@ -6,7 +6,7 @@ import (
 	"time"
 
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
-	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
+	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2"
 	"github.com/NorskHelsenett/ror/pkg/config/rorconfig"
 	"github.com/NorskHelsenett/ror/pkg/config/rorversion"
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"

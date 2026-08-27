@@ -17,7 +17,7 @@ import (
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apikeystypes/v2"
 	kubernetesclient "github.com/NorskHelsenett/ror/pkg/clients/kubernetes"
-	"github.com/NorskHelsenett/ror/pkg/clients/rorclient"
+	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2/transports/resttransport"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2/transports/resttransport/httpauthprovider"
 	"github.com/NorskHelsenett/ror/pkg/clients/rorclient/v2/transports/resttransport/httpclient"
@@ -267,7 +267,7 @@ func NewRorAgentClient(opts ...Option) (RorAgentClientInterface, error) {
 		return nil, err
 	}
 
-	ver, err := client.rorAPIClient.Info().GetVersion(context.TODO())
+	ver, err := client.rorAPIClient.V1().Info().GetVersion(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (r *rorAgentClient) PingRorAPI() error {
 	if r.rorAPIClient == nil {
 		r.initUnathorizedRorClient()
 	}
-	if r.rorAPIClient.Ping() {
+	if r.rorAPIClient.Ping(context.TODO()) {
 		return nil
 	}
 	return fmt.Errorf("could not ping ror-api")
@@ -500,7 +500,7 @@ func (r *rorAgentClient) initRorAgentClientSetup() error {
 		rlog.Info("api key secret not found, registering new key")
 
 		r.initUnathorizedRorClient()
-		resp, err := r.rorAPIClient.ApiKeysV2().RegisterAgent(context.TODO(), apikeystypes.RegisterClusterRequest{
+		resp, err := r.rorAPIClient.V2().ApiKeys().RegisterAgent(context.TODO(), apikeystypes.RegisterClusterRequest{
 			ClusterId: r.config.clusterId,
 			// Forward a known uid (e.g. from a prior secret) as a hint. The API
 			// verifies it and never blindly trusts it.

@@ -74,7 +74,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Download binary build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
       - name: Check env
         run: |
           echo "Building container ${{ env.APP }} ${{ needs.setenv.outputs.rorversion}} (${{ needs.setenv.outputs.shortsha}})"

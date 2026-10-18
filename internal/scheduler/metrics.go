@@ -10,7 +10,7 @@ import (
 
 	"github.com/NorskHelsenett/ror/pkg/apicontracts"
 	"github.com/NorskHelsenett/ror/pkg/apicontracts/apiresourcecontracts"
-	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
+	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/aclscope"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 
 	apimachinery "k8s.io/apimachinery/pkg/api/resource"
@@ -33,7 +33,7 @@ func MetricsReporting(rorClientInterface clusteragentclient.RorAgentClientInterf
 	ownerref := authservice.CreateOwnerref()
 
 	metricsReport.Owner = apiresourcecontracts.ResourceOwnerReference{
-		Scope:   aclmodels.Acl2Scope(ownerref.Scope),
+		Scope:   aclscope.Scope(ownerref.Scope),
 		Subject: string(ownerref.Subject),
 	}
 	metricsReport.Nodes = metricsReportNodes

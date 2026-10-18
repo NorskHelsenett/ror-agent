@@ -49,7 +49,7 @@ jobs:
           CGO_ENABLED=0 go build -o dist/${{ env.APP }} -ldflags "-w -extldflags '-static' -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Version=${{ needs.setenv.outputs.rorversion}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.Commit=${{ needs.setenv.outputs.shortsha}} -X github.com/NorskHelsenett/ror/pkg/config/rorversion.LibVer=${{ needs.setenv.outputs.libver}}" ${{ env.APP_PATH }}/main.go
           touch dist/isbuilt/${{ env.APP }}
     - name: Archive binary
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: binary-build
         path: |
@@ -70,7 +70,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Download binary build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
       - name: Check env
         run: |
           echo "Building container ${{ env.APP }} ${{ needs.setenv.outputs.rorversion}} (${{ needs.setenv.outputs.shortsha}})"
@@ -84,17 +84,17 @@ jobs:
         with:
           cosign-release: 'v2.2.4'
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+        uses: docker/setup-buildx-action@4
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        uses: docker/login-action@4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
+        uses: docker/metadata-action@6 # v5.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |

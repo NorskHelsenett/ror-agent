@@ -12,7 +12,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/helpers/resourcecache"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v3"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
-	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
+	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/aclscope"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
 	"github.com/NorskHelsenett/ror/pkg/rorresources"
@@ -115,8 +115,8 @@ func updateClusterResource(agentclient Client, resourceCacheInterface resourceca
 		clusterresource.RorMeta.Action = rortypes.K8sActionUpdate
 		// Update the KubernetesCluster ownerref to UID on subsequent runs
 		clusterresource.RorMeta.Ownerref = rorresourceowner.RorResourceOwnerReference{
-			Scope:   aclmodels.Acl2ScopeCluster,
-			Subject: aclmodels.Acl2Subject(string(clusterresource.Metadata.UID)),
+			Scope:   aclscope.ScopeCluster,
+			Subject: aclscope.Subject(string(clusterresource.Metadata.UID)),
 		}
 	}
 
@@ -125,8 +125,8 @@ func updateClusterResource(agentclient Client, resourceCacheInterface resourceca
 	// first creation, UID on subsequent updates) to avoid a bootstrap chicken-and-egg:
 	// on first registration the identity doesn't yet know the UID.
 	agentclient.GetRorClient().SetOwnerref(rorresourceowner.RorResourceOwnerReference{
-		Scope:   aclmodels.Acl2ScopeCluster,
-		Subject: aclmodels.Acl2Subject(clusterUID),
+		Scope:   aclscope.ScopeCluster,
+		Subject: aclscope.Subject(clusterUID),
 	})
 
 	clusterresource.RorMeta.LastReported = time.Now().String()

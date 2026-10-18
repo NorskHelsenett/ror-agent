@@ -30,7 +30,7 @@ import (
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/clusterinterregator/v3"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/interregators/interregatortypes/v3"
 	"github.com/NorskHelsenett/ror/pkg/kubernetes/providers/providermodels"
-	"github.com/NorskHelsenett/ror/pkg/models/aclmodels"
+	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/aclscope"
 	"github.com/NorskHelsenett/ror/pkg/models/aclmodels/rorresourceowner"
 	identitymodels "github.com/NorskHelsenett/ror/pkg/models/identity"
 	"github.com/NorskHelsenett/ror/pkg/rlog"
@@ -299,8 +299,8 @@ func NewRorAgentClient(opts ...Option) (RorAgentClientInterface, error) {
 		ownerSubject = selfdata.User.Name
 	}
 	client.rorAPIClient.SetOwnerref(rorresourceowner.RorResourceOwnerReference{
-		Scope:   aclmodels.Acl2ScopeCluster,
-		Subject: aclmodels.Acl2Subject(ownerSubject),
+		Scope:   aclscope.ScopeCluster,
+		Subject: aclscope.Subject(ownerSubject),
 	})
 	rorconfig.Set(configconsts.CLUSTER_ID, selfdata.User.Name)
 
